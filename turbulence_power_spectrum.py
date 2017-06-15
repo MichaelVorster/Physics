@@ -6,8 +6,22 @@
 # Author: Michael Vorster
 # Last updated: 13 June 2017
 
-from numpy import *
-from matplotlib.pyplot import *
+from fitcurve import savitzky_golay
+from numpy import (
+    argmax,
+    array,
+    average,
+    random
+)
+from matplotlib.pyplot import (
+    axis,
+    plot,
+    savefig,
+    show,
+    title,
+    xlabel,
+    ylabel
+)
 
 
 def grid_info(D):
@@ -43,6 +57,46 @@ def select_step_direction(dimensions, step_size):
     return d_index
 
 
+# Calculate the average profile of a fluid quantity along the x-axis, i.e.,
+# the fluid quantity is averaged along the y- and z-axes.  In general the
+# averaged profile will not be smooth.  Therefore, it is necessary to fit a
+# smooth function to the profile.  However, the presence of a shock complicates
+# the problem.
+#
+# The approach is to fit the shocked region with a smooth curve.  Upstream of
+# the shock the fluid quantity is again averaged, but this time over all axes.
+# The second averaging should ensure a smooth profile upstream of the shock.
+def average_fluid_field(x1, qx, nx, fluid_quantity):
+    avrg_qx = [0]*nx[0]
+    for i in range(0, nx[0]):
+        avrg_qx[i] = average(qx[i, :, :])
+
+    original_profile = list(avrg_qx)
+
+    # it is usefule to fit the data a few grid points beyond shock position
+    shock_position = argmax(avrg_qx) + 1
+    downstream_fit = savitzky_golay(
+        avrg_qx[0:shock_position], 41, 1
+    )
+    upstream_fit = average(qx[shock_position+1:, :, :])
+
+    for i in range(0, shock_position):
+        avrg_qx[i] = downstream_fit[i]
+    for i in range(shock_position, nx[0]):
+        avrg_qx[i] = upstream_fit
+
+    y_max = 1.2*max(avrg_qx)
+    plot(x1, avrg_qx, 'k', x1, original_profile, 'r')
+    xlabel(r'x')
+    ylabel(r'Fitted (black), Original (red)')
+    title('Average ' + fluid_quantity)
+    axis([0, 1, -0.5, y_max])
+    savefig(fluid_quantity+'_x_average')
+    show()
+
+    return avrg_qx
+
+
 # Select random point
 def select_random_point(dimensions, nx, d_index):
     indices = [0]*dimensions
@@ -72,7 +126,6 @@ def calculate_correlation_single_point(dimensions, indices, d_index, del_qx):
     vector_diff = [0]*len(del_qx)
     correlation = 0
     for i in range(0, len(del_qx)):
-
         x1 = indices[0]
         x2 = indices[0] + d_index[0]
         y1 = indices[1]
@@ -80,7 +133,7 @@ def calculate_correlation_single_point(dimensions, indices, d_index, del_qx):
         z1 = indices[2]
         z2 = indices[2] + d_index[2]
 
-        vector_diff[i] = del_qx[i][x1,y1,z1] - del_qx[i][x2,y2,z2]
+        vector_diff[i] = del_qx[i][x1, y1, z1] - del_qx[i][x2, y2, z2]
         correlation = correlation + vector_diff[i]**2
     return correlation
 
@@ -108,7 +161,11 @@ def calculate_correlation_vector(
     return correlation_vector
 
 
-def plot_function(correlation_vector, max_step_size, graph_title=''):
+def plot_structure_function(
+    correlation_vector,
+    max_step_size,
+    graph_title=''
+):
     x = range(1, max_step_size+1)
     x_max = max_step_size + 1
     y_max = 1.2*max(correlation_vector)
@@ -116,9 +173,9 @@ def plot_function(correlation_vector, max_step_size, graph_title=''):
     plot(x, correlation_vector)
     xlabel(r'x')
     ylabel(r'$S(x)$')
-    title(graph_title)
-    axis([0,x_max,0,y_max])
-    show() 
+    title(graph_title + ' structure function')
+    axis([0, x_max, 0, y_max])
+    show()
 
 
 def density_turbulence_spectrum(D, num_sample_points):
@@ -127,8 +184,15 @@ def density_turbulence_spectrum(D, num_sample_points):
     avrg_rho = average(D.rho)
     # Turbulent variations
     del_rho = [
-        array(D.rho)-avrg_rho 
+        array(D.rho)-avrg_rho
     ]
+
+    avrg_rho = average_fluid_field(
+        D.x1,
+        D.rho,
+        nx,
+        'Density'
+    )
 
     correlation_vector_rho = calculate_correlation_vector(
         num_sample_points,
@@ -138,7 +202,7 @@ def density_turbulence_spectrum(D, num_sample_points):
         del_rho
     )
 
-    plot_function(
+    plot_structure_function(
       correlation_vector_rho,
       max_step_size,
       graph_title=r'Density'
@@ -157,6 +221,14 @@ def velocity_turbulence_spectrum(D, num_sample_points):
         array(D.vx2)-avrg_vx2,
         array(D.vx3)-avrg_vx3,
     ]
+
+    avrg_vx1 = average_fluid_field(
+        D.x1,
+        D.vx1,
+        nx,
+        '$V_x$'
+    )
+
     correlation_vector_vx = calculate_correlation_vector(
         num_sample_points,
         nx,
@@ -165,7 +237,7 @@ def velocity_turbulence_spectrum(D, num_sample_points):
         del_vx
     )
 
-    plot_function(
+    plot_structure_function(
       correlation_vector_vx,
       max_step_size,
       graph_title=r'Velocity'
@@ -177,9 +249,9 @@ if __name__ == "__main__":
     import pyPLUTO as pp
 
     plutodir = os.environ['PLUTO_DIR']
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/output/'
+    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_8/output/'
 
-    D = pp.pload(5, w_dir=wdir)
+    D = pp.pload(7, w_dir=wdir)
     num_sample_points = 10000
 
     density_turbulence_spectrum(D, num_sample_points)
