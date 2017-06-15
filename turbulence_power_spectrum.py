@@ -10,15 +10,21 @@ from numpy import *
 from matplotlib.pyplot import *
 
 
-def get_dimensions(nx):
+def grid_info(D):
     # Number of dimensions
-    dimensions = len(nx)
+    dimensions = 3
+    nx = (len(D.x1), len(D.x2), len(D.x3))
+    dx = [
+        (max(D.x1) - min(D.x1))/(nx[0] - 1.),
+        (max(D.x2) - min(D.x2))/(nx[1] - 1.),
+        (max(D.x3) - min(D.x3))/(nx[2] - 1.)
+    ]
     # we will only sample points that are not more than half a grid size
     # separated.  If grid does not have an equal size in all directions,
     # then the step size is determined by the smallest grid direction
     max_step_size = min(nx)/2
 
-    return dimensions, max_step_size
+    return dimensions, nx, dx, max_step_size
 
 
 # Select step direction
@@ -69,19 +75,12 @@ def calculate_correlation_single_point(dimensions, indices, d_index, del_qx):
 
         x1 = indices[0]
         x2 = indices[0] + d_index[0]
-        if dimensions > 1:
-            y1 = indices[1]
-            y2 = indices[1] + d_index[1]
-            if dimensions > 2:
-                z1 = indices[2]
-                z2 = indices[2] + d_index[2]
+        y1 = indices[1]
+        y2 = indices[1] + d_index[1]
+        z1 = indices[2]
+        z2 = indices[2] + d_index[2]
 
-        if dimensions == 1:
-            vector_diff[i] = del_qx[i][x1] - del_qx[i][x2]
-        elif dimensions == 2:
-            vector_diff[i] = del_qx[i][x1,y1] - del_qx[i][x2,y2]
-        else:
-            vector_diff[i] = del_qx[i][x1,y1,z1] - del_qx[i][x2,y2,z2]
+        vector_diff[i] = del_qx[i][x1,y1,z1] - del_qx[i][x2,y2,z2]
         correlation = correlation + vector_diff[i]**2
     return correlation
 
@@ -122,8 +121,8 @@ def plot_function(correlation_vector, max_step_size, graph_title=''):
     show() 
 
 
-def density_turbulence_spectrum(D, nx, dx, num_sample_points):
-    dimensions, max_step_size = get_dimensions(nx)
+def density_turbulence_spectrum(D, num_sample_points):
+    dimensions, nx, dx, max_step_size = grid_info(D)
     # Average values
     avrg_rho = average(D.rho)
     # Turbulent variations
@@ -146,8 +145,8 @@ def density_turbulence_spectrum(D, nx, dx, num_sample_points):
     )
 
 
-def velocity_turbulence_spectrum(D, nx, dx, num_sample_points):
-    dimensions, max_step_size = get_dimensions(nx)
+def velocity_turbulence_spectrum(D, num_sample_points):
+    dimensions, nx, dx, max_step_size = grid_info(D)
     # Average values
     avrg_vx1 = average(D.vx1)
     avrg_vx2 = average(D.vx2)
@@ -181,9 +180,7 @@ if __name__ == "__main__":
     wdir = '/home/mvorster/PLUTO/Shock_turbulence/output/'
 
     D = pp.pload(5, w_dir=wdir)
-    nx = (len(D.x1), len(D.x2), len(D.x3))
-    dx = 1028./nx[0]
     num_sample_points = 10000
 
-    density_turbulence_spectrum(D, nx, dx, num_sample_points)
-    velocity_turbulence_spectrum(D, nx, dx, num_sample_points)
+    density_turbulence_spectrum(D, num_sample_points)
+    velocity_turbulence_spectrum(D, num_sample_points)
