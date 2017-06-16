@@ -128,14 +128,14 @@ def calculate_difference_squared(dimensions, indices, d_index, del_qx):
     difference = [0]*len(del_qx)
     difference_squared = 0
     for i in range(0, len(del_qx)):
-        x1 = indices[0]
-        x2 = indices[0] + d_index[0]
-        y1 = indices[1]
-        y2 = indices[1] + d_index[1]
-        z1 = indices[2]
-        z2 = indices[2] + d_index[2]
+        x11 = indices[0]
+        x12 = indices[0] + d_index[0]
+        x21 = indices[1]
+        x22 = indices[1] + d_index[1]
+        x31 = indices[2]
+        x32 = indices[2] + d_index[2]
 
-        difference[i] = del_qx[i][x1, y1, z1] - del_qx[i][x2, y2, z2]
+        difference[i] = del_qx[i][x11, x21, x31] - del_qx[i][x12, x22, x32]
         difference_squared = difference_squared + difference[i]**2
     return difference_squared
 
@@ -164,15 +164,15 @@ def calculate_structure_function(
 
 
 def plot_structure_function(
-    calculate_structure,
+    structure_function,
     max_step_size,
     graph_title=''
 ):
     x = range(1, max_step_size+1)
     x_max = max_step_size + 1
-    y_max = 1.2*max(calculate_structure)
+    y_max = 1.2*max(structure_function)
 
-    plot(x, calculate_structure)
+    plot(x, structure_function)
     xlabel(r'x')
     ylabel(r'$S(x)$')
     title(graph_title + ' structure function')
@@ -196,7 +196,7 @@ def density_turbulence_spectrum(D, num_sample_points):
         'Density'
     )
 
-    calculate_structure_rho = calculate_structure_function(
+    structure_function_rho = calculate_structure_function(
         num_sample_points,
         nx,
         dimensions,
@@ -205,7 +205,7 @@ def density_turbulence_spectrum(D, num_sample_points):
     )
 
     plot_structure_function(
-      calculate_structure_rho,
+      structure_function_rho,
       max_step_size,
       graph_title=r'Density'
     )
@@ -228,10 +228,10 @@ def velocity_turbulence_spectrum(D, num_sample_points):
         D.x1,
         D.vx1,
         nx,
-        '$V_x$'
+        '$V_{x_1}$'
     )
 
-    calculate_structure_vx = calculate_structure_function(
+    structure_function_vx = calculate_structure_function(
         num_sample_points,
         nx,
         dimensions,
@@ -240,7 +240,7 @@ def velocity_turbulence_spectrum(D, num_sample_points):
     )
 
     plot_structure_function(
-      calculate_structure_vx,
+      structure_function_vx,
       max_step_size,
       graph_title=r'Velocity'
     )
