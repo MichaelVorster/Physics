@@ -1,10 +1,11 @@
 # This code calculates the structure function spectrum for the density,
-# velocity, and magnetic field.
+# velocity, and magnetic field.  It is assumed that there is a planar shock
+# present, and that this shock propagates in the x-direction
 
 # LIMITATION: code currently only works for Cartesian grids
 
 # Author: Michael Vorster
-# Last updated: 13 June 2017
+# Last updated: 16 June 2017
 
 from fitcurve import savitzky_golay
 from numpy import (
@@ -177,24 +178,27 @@ def plot_structure_function(
     ylabel(r'$S(x)$')
     title(graph_title + ' structure function')
     axis([0, x_max, 0, y_max])
+    savefig(graph_title+'_structure_function')
     show()
 
 
 def density_turbulence_spectrum(D, num_sample_points):
     dimensions, nx, dx, max_step_size = grid_info(D)
-    # Average values
-    avrg_rho = average(D.rho)
-    # Turbulent variations
-    del_rho = [
-        array(D.rho)-avrg_rho
-    ]
 
+    # Average values
     avrg_rho = average_fluid_field(
         D.x1,
         D.rho,
         nx,
         'Density'
     )
+
+    # Turbulent variations
+    del_rho = array(list(D.rho))
+    for i in range(0, nx[0]):
+        del_rho[i, :, :] = array(D.rho[i, :, :] - avrg_rho[i])
+
+    del_rho = [del_rho]
 
     structure_function_rho = calculate_structure_function(
         num_sample_points,
@@ -213,23 +217,29 @@ def density_turbulence_spectrum(D, num_sample_points):
 
 def velocity_turbulence_spectrum(D, num_sample_points):
     dimensions, nx, dx, max_step_size = grid_info(D)
-    # Average values
-    avrg_vx1 = average(D.vx1)
-    avrg_vx2 = average(D.vx2)
-    avrg_vx3 = average(D.vx3)
-    # Turbulent variations
-    del_vx = [
-        array(D.vx1)-avrg_vx1,
-        array(D.vx2)-avrg_vx2,
-        array(D.vx3)-avrg_vx3,
-    ]
 
+    # Average values
     avrg_vx1 = average_fluid_field(
         D.x1,
         D.vx1,
         nx,
         '$V_{x_1}$'
     )
+    avrg_vx2 = average(D.vx2)
+    avrg_vx3 = average(D.vx3)
+
+    # Turbulent variations
+    del_vx1 = array(list(D.vx1))
+    for i in range(0, nx[0]):
+        del_vx1[i, :, :] = array(D.vx1[i, :, :] - avrg_vx1[i])
+    del_vx2 = array(D.vx2)-avrg_vx2
+    del_vx3 = array(D.vx3)-avrg_vx3
+
+    del_vx = [
+        del_vx1,
+        del_vx2,
+        del_vx3
+    ]
 
     structure_function_vx = calculate_structure_function(
         num_sample_points,
