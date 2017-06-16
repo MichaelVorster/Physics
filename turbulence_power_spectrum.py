@@ -121,10 +121,12 @@ def test_index_step(dimensions, nx, d_index, indices):
     return indices
 
 
-# Calculate correlation between selected points
-def calculate_correlation_single_point(dimensions, indices, d_index, del_qx):
-    vector_diff = [0]*len(del_qx)
-    correlation = 0
+# Calculate the square of the difference of a fluid quantity between
+# two selected points.  If fluid quantity is a vector, then the difference
+# is calculated for every vector component
+def calculate_difference_squared(dimensions, indices, d_index, del_qx):
+    difference = [0]*len(del_qx)
+    difference_squared = 0
     for i in range(0, len(del_qx)):
         x1 = indices[0]
         x2 = indices[0] + d_index[0]
@@ -133,44 +135,44 @@ def calculate_correlation_single_point(dimensions, indices, d_index, del_qx):
         z1 = indices[2]
         z2 = indices[2] + d_index[2]
 
-        vector_diff[i] = del_qx[i][x1, y1, z1] - del_qx[i][x2, y2, z2]
-        correlation = correlation + vector_diff[i]**2
-    return correlation
+        difference[i] = del_qx[i][x1, y1, z1] - del_qx[i][x2, y2, z2]
+        difference_squared = difference_squared + difference[i]**2
+    return difference_squared
 
 
 # Calculate the correlation function as a function of grid separation
-def calculate_correlation_vector(
+def calculate_structure_function(
     num_sample_points,
     nx,
     dimensions,
     max_step_size,
     del_qx
 ):
-    correlation_vector = []
+    structure_function = []
     for step_size in range(1, max_step_size + 1):
-        correlation = 0
+        diff_squared = 0
         for n in range(1, num_sample_points):
             d_index = select_step_direction(dimensions, step_size)
             indices = select_random_point(dimensions, nx, d_index)
-            correlation_single_point = calculate_correlation_single_point(
+            diff_squared_single_point = calculate_difference_squared(
                 dimensions, indices, d_index, del_qx
             )
-            correlation = correlation + correlation_single_point
-        avrg_correlation = correlation/num_sample_points
-        correlation_vector.append(avrg_correlation)
-    return correlation_vector
+            diff_squared = diff_squared + diff_squared_single_point
+            avrg_diff_squared = diff_squared/num_sample_points
+        structure_function.append(avrg_diff_squared)
+    return structure_function
 
 
 def plot_structure_function(
-    correlation_vector,
+    calculate_structure,
     max_step_size,
     graph_title=''
 ):
     x = range(1, max_step_size+1)
     x_max = max_step_size + 1
-    y_max = 1.2*max(correlation_vector)
+    y_max = 1.2*max(calculate_structure)
 
-    plot(x, correlation_vector)
+    plot(x, calculate_structure)
     xlabel(r'x')
     ylabel(r'$S(x)$')
     title(graph_title + ' structure function')
@@ -194,7 +196,7 @@ def density_turbulence_spectrum(D, num_sample_points):
         'Density'
     )
 
-    correlation_vector_rho = calculate_correlation_vector(
+    calculate_structure_rho = calculate_structure_function(
         num_sample_points,
         nx,
         dimensions,
@@ -203,7 +205,7 @@ def density_turbulence_spectrum(D, num_sample_points):
     )
 
     plot_structure_function(
-      correlation_vector_rho,
+      calculate_structure_rho,
       max_step_size,
       graph_title=r'Density'
     )
@@ -229,7 +231,7 @@ def velocity_turbulence_spectrum(D, num_sample_points):
         '$V_x$'
     )
 
-    correlation_vector_vx = calculate_correlation_vector(
+    calculate_structure_vx = calculate_structure_function(
         num_sample_points,
         nx,
         dimensions,
@@ -238,7 +240,7 @@ def velocity_turbulence_spectrum(D, num_sample_points):
     )
 
     plot_structure_function(
-      correlation_vector_vx,
+      calculate_structure_vx,
       max_step_size,
       graph_title=r'Velocity'
     )
