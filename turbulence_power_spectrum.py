@@ -121,56 +121,58 @@ def test_index_step(dimensions, nx, d_index, indices):
     return indices
 
 
-# Calculate correlation between selected points
-def calculate_correlation_single_point(dimensions, indices, d_index, del_qx):
-    vector_diff = [0]*len(del_qx)
-    correlation = 0
+# Calculate the square of the difference of a fluid quantity between
+# two selected points.  If fluid quantity is a vector, then the difference
+# is calculated for every vector component
+def calculate_difference_squared(dimensions, indices, d_index, del_qx):
+    difference = [0]*len(del_qx)
+    difference_squared = 0
     for i in range(0, len(del_qx)):
-        x1 = indices[0]
-        x2 = indices[0] + d_index[0]
-        y1 = indices[1]
-        y2 = indices[1] + d_index[1]
-        z1 = indices[2]
-        z2 = indices[2] + d_index[2]
+        x11 = indices[0]
+        x12 = indices[0] + d_index[0]
+        x21 = indices[1]
+        x22 = indices[1] + d_index[1]
+        x31 = indices[2]
+        x32 = indices[2] + d_index[2]
 
-        vector_diff[i] = del_qx[i][x1, y1, z1] - del_qx[i][x2, y2, z2]
-        correlation = correlation + vector_diff[i]**2
-    return correlation
+        difference[i] = del_qx[i][x11, x21, x31] - del_qx[i][x12, x22, x32]
+        difference_squared = difference_squared + difference[i]**2
+    return difference_squared
 
 
 # Calculate the correlation function as a function of grid separation
-def calculate_correlation_vector(
+def calculate_structure_function(
     num_sample_points,
     nx,
     dimensions,
     max_step_size,
     del_qx
 ):
-    correlation_vector = []
+    structure_function = []
     for step_size in range(1, max_step_size + 1):
-        correlation = 0
+        diff_squared = 0
         for n in range(1, num_sample_points):
             d_index = select_step_direction(dimensions, step_size)
             indices = select_random_point(dimensions, nx, d_index)
-            correlation_single_point = calculate_correlation_single_point(
+            diff_squared_single_point = calculate_difference_squared(
                 dimensions, indices, d_index, del_qx
             )
-            correlation = correlation + correlation_single_point
-        avrg_correlation = correlation/num_sample_points
-        correlation_vector.append(avrg_correlation)
-    return correlation_vector
+            diff_squared = diff_squared + diff_squared_single_point
+            avrg_diff_squared = diff_squared/num_sample_points
+        structure_function.append(avrg_diff_squared)
+    return structure_function
 
 
 def plot_structure_function(
-    correlation_vector,
+    structure_function,
     max_step_size,
     graph_title=''
 ):
     x = range(1, max_step_size+1)
     x_max = max_step_size + 1
-    y_max = 1.2*max(correlation_vector)
+    y_max = 1.2*max(structure_function)
 
-    plot(x, correlation_vector)
+    plot(x, structure_function)
     xlabel(r'x')
     ylabel(r'$S(x)$')
     title(graph_title + ' structure function')
@@ -194,7 +196,7 @@ def density_turbulence_spectrum(D, num_sample_points):
         'Density'
     )
 
-    correlation_vector_rho = calculate_correlation_vector(
+    structure_function_rho = calculate_structure_function(
         num_sample_points,
         nx,
         dimensions,
@@ -203,7 +205,7 @@ def density_turbulence_spectrum(D, num_sample_points):
     )
 
     plot_structure_function(
-      correlation_vector_rho,
+      structure_function_rho,
       max_step_size,
       graph_title=r'Density'
     )
@@ -226,10 +228,10 @@ def velocity_turbulence_spectrum(D, num_sample_points):
         D.x1,
         D.vx1,
         nx,
-        '$V_x$'
+        '$V_{x_1}$'
     )
 
-    correlation_vector_vx = calculate_correlation_vector(
+    structure_function_vx = calculate_structure_function(
         num_sample_points,
         nx,
         dimensions,
@@ -238,7 +240,7 @@ def velocity_turbulence_spectrum(D, num_sample_points):
     )
 
     plot_structure_function(
-      correlation_vector_vx,
+      structure_function_vx,
       max_step_size,
       graph_title=r'Velocity'
     )
