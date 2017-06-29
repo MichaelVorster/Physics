@@ -1,97 +1,111 @@
-def select_starting_indices(dimensions, nx):
-    indices = [0]*dimensions
+def select_starting_position(dimensions, nx, grid_max):
+    coordinates = [0]*dimensions
     for dimension in range(0, dimensions):
-        indices[dimension] = random.random_integers(0, nx[dimension]-1)
+        coordinates[dimension] = random.random()*grid_max[dimension]
 
-    return indices
-
-
-def calculate_next_position(D, indices, step_length):
-    ni, nj, nk = indices
-
-    B_magnitude = sqrt(
-        square(D.bx1[ni, nj, nk]) +
-        square(D.bx2[ni, nj, nk]) +
-        square(D.bx3[ni, nj, nk])
-    )
-    
-    step = array([
-        D.bx1[ni, nj, nk],
-        D.bx2[ni, nj, nk],
-        D.bx3[ni, nj, nk]
-    ])*step_length/B_magnitude
-    
-    next_position = [
-        D.x1[ni] + step[0],
-        D.x2[nj] + step[1],
-        D.x3[nk] + step[2]
-    ]    
-
-    return next_position
+    return coordinates
 
 
-# The next point should be somewhere in a cube defined by eight grid points
-def calculate_surrounding_indices(next_position, step_length):
-    ni = floor(next_position[0]/step_length)
-    nj = floor(next_position[1]/step_length)
-    nk = floor(next_position[2]/step_length)
+def calculate_next_position(
+    dimensions,
+    starting_position,
+    B_field,
+    step_length,
+    grid_max
+):
+    out_of_domain = 0
+    B_dot_product = 0
+    for dimension in range(0, dimensions):
+        B_dot_product = B_dot_product + square(B_field[dimension])
+    B_magnitude = sqrt(B_dot_product)
 
+    next_position = [0]*dimensions
+    for dimension in range(0, dimensions):
+        step = B_field[dimension]*step_length/B_magnitude
+        next_position[dimension] = starting_position[dimension] + step
+        if next_position[dimension] > grid_max[dimension]:
+        	out_of_domain = 1
 
-def factory_interpolate(D, bx):
-    return RegularGridInterpolator(
-        points=[
-            D.x1, D.x2, D.x3
-        ],
-        values=bx
-    )
-
-
-def interpolate_magnetic_field(D, position, step_length):
-    interpolate_bx1 = factory_interpolate(D, D.bx1)
-    interpolate_bx2 = factory_interpolate(D, D.bx2)
-    interpolate_bx3 = factory_interpolate(D, D.bx3)
- 
-    bx1 = interpolate_bx1(position)
-    bx2 = interpolate_bx2(position)
-    bx3 = interpolate_bx3(position)
-
-    return [bx1, bx2, bx3]
-
-
-def construct_field_line(D, dimensions, nx):
-    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/2.
-
-    starting_indices = select_starting_indices(dimensions, nx)
-    next_position = calculate_next_position(D, starting_indices, step_length)
-    next_indices = calculate_surrounding_indices(next_position, step_length)
-
-    B_field = interpolate_magnetic_field(D, next_position, step_length)
-    
-    nx, ny, nz = starting_indices
-
-    print('Starting point: \n')
-    print(D.x1[nx], D.x2[ny], D.x3[nz])
-    print('\n')
-
-    print('Starting point B field: \n')
-    print(D.bx1[nx, ny, nz], D.bx2[nx, ny, nz], D.bx3[nx, ny, nz])
-    print('\n')
-
-    print('New point: \n')
     print(next_position)
-    print('\n')
+    	
 
-    print('New point B field: \n')
-    print(B_field)
-    print('\n')
+    return next_position, out_of_domain
 
+
+def interpolate_magnetic_field(dimensions, grid, B_component_array, position):
+    B_field = [0]*dimensions
+    for dimension in range(0, dimensions):
+        interpolate_b = RegularGridInterpolator(
+            points=grid,
+            values=B_component_array[dimension]
+        )
+        B_field[dimension] = interpolate_b(position)
+
+    return B_field
+
+
+def construct_field_line(D):
+    dimensions = 2
+    nx = [len(D.x2), len(D.x3)]
+    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/2.
+    number_of_steps = 1
+
+    grid = [D.x2, D.x3]
+    grid_max = [max(D.x2), max(D.x3)]
+    B_component_array = [D.bx2[512, :, :], D.bx3[512, :, :]]
+
+    starting_position = select_starting_position(dimensions, nx, grid_max)
+    B_field = interpolate_magnetic_field(
+        dimensions,
+        grid,
+        B_component_array,
+        starting_position
+    )
+
+    print(starting_position)
+
+    quiver(
+        D.x2[60:70],
+        D.x3[60:70],
+        D.bx2[512, 60:70, 60:70],
+        D.bx3[512, 60:70, 60:70],
+        units='width'
+    )
+
+    out_of_domain = 0
+    step = 1
+    while not out_of_domain and step <= number_of_steps:
+        next_position, out_of_domain = calculate_next_position(
+            dimensions,
+            starting_position,
+            B_field,
+            step_length,
+            grid_max
+        )
+        step += 1
+        '''
+        B_field = interpolate_magnetic_field(
+            dimensions,
+            grid,
+            B_component_array,
+            next_position
+        )
+        starting_position = next_position
+
+        quiver(
+            next_position[0],
+            next_position[1],
+            B_field[0],
+            B_field[1],
+            color='r'
+        )
+
+        show()
+        '''
 
 if __name__ == '__main__':
-
-    from math import floor
-    from matplotlib.pyplot import *
+    from matplotlib.pyplot import quiver, show
     from numpy import (
-        array,
         random,
         square,
         sqrt
@@ -99,11 +113,7 @@ if __name__ == '__main__':
     from pyPLUTO import pload
     from scipy.interpolate import RegularGridInterpolator
 
-
     wdir = '/home/mvorster/PLUTO/Shock_turbulence/output/'
-    D = pload(0 ,w_dir=wdir)
+    D = pload(0, w_dir=wdir)
 
-    dimensions = 3
-    nx = [len(D.x1), len(D.x2), len(D.x3)]
-
-    construct_field_line(D, dimensions, nx)
+    construct_field_line(D)
