@@ -109,9 +109,6 @@ def remove_additional_point(
 
 
 def get_grid_info(dimensions, D):
-    # assumes that the grid separation is the same in all directions
-    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/2.
-
     # for plotting purposes arrays must have same dimensions.
     # Only x2 and x3 have the same dimensions
     if dimensions == 2:
@@ -130,11 +127,17 @@ def get_grid_info(dimensions, D):
         grid_min[dimension] = min(grid[dimension])
         grid_max[dimension] = max(grid[dimension])
 
-    return nx, step_length, grid, grid_min, grid_max, B_component_array
+    return nx, grid, grid_min, grid_max, B_component_array
 
 
-def construct_field_lines(dimensions, D, separation, number_of_steps):
-    nx, step_length, grid, grid_min, grid_max, B_component_array = \
+def construct_field_lines(
+    dimensions,
+    D,
+    separation,
+    number_of_steps,
+    step_length
+):
+    nx, grid, grid_min, grid_max, B_component_array = \
         get_grid_info(dimensions, D)
 
     starting_positions = select_starting_positions(
@@ -144,6 +147,7 @@ def construct_field_lines(dimensions, D, separation, number_of_steps):
         grid_max,
         separation
     )
+    # starting_positions = [[0.06, 0.06], [0.066, 0.06]]
 
     B_field = [[], []]
     for i in (0, 1):
@@ -217,9 +221,14 @@ def calculate_field_line_separation(dimensions, field_lines):
             separation_vector[dimension] = \
                 field_lines[1][dimension][step] - \
                 field_lines[0][dimension][step]
-        separation_magnitude = sqrt(sum(square(separation_vector)))
+        separation_magnitude_squared = sum(square(separation_vector))
+        separation_perp_squared = (
+            square(separation_vector[0]) +
+            square(separation_vector[2])
+        )
         diffusion[0].append(step)
-        diffusion[1].append(separation_magnitude)
+        # diffusion[1].append(separation_magnitude_squared)
+        diffusion[1].append(separation_perp_squared)
 
     return diffusion
 
@@ -229,8 +238,8 @@ def plot_field_lines(
     field_line_coordinates,
     field_line_components
 ):
-    begin = 0
-    end = 255
+    begin = 60
+    end = 80
     x_slice = 512
 
     axis('equal')
@@ -267,30 +276,56 @@ def add_result(number_of_steps, average_diffusion, diffusion):
 
 
 def plot_diffusion(number_of_separations, average_diffusion_per_separation):
-    Richardson_x = range(0, 100)
-    Richardson_y = power(Richardson_x, 0.5)
+    Richardson_x = array(range(10, 100))*1e-3
+    Richardson_y = power(Richardson_x, 1.5)*0.5
+    Kolmogorov_x = array(range(10, 100))*1e-3
+    Kolmogorov_y = power(Kolmogorov_x, 0.5)*0.2
     for separation in range(0, number_of_separations):
         loglog(
             average_diffusion_per_separation[separation][0],
             average_diffusion_per_separation[separation][1]
         )
-    loglog(Richardson_x, 1e-3*Richardson_y)
-    show()
+    loglog(Richardson_x, Richardson_y)
+    loglog(Kolmogorov_x, Kolmogorov_y)
+    xlabel(r'Distance along B')
+    ylabel(r'RMS separation of lines')
+    savefig('B_field_line_diffusion.png')
+    # show()
 
+
+def write_diffusion_to_file(
+	number_of_separations,
+    average_diffusion_per_separation
+):
+    f = open('diffusion_field_lines.txt', 'w')
+    f.write('Distance along B,    RMS separation of lines\n')
+    f.write('\n')
+    for separation in range(0, number_of_separations):
+    	#print(average_diffusion_per_separation[separation][0])
+        number_of_steps = len(
+            average_diffusion_per_separation[separation][0]
+        )
+        for step in range(0, number_of_steps):
+            f.write('%0.10f,        %1.10f\n' %
+                (
+                    average_diffusion_per_separation[separation][0][step],
+                    average_diffusion_per_separation[separation][1][step]
+                )
+            )
+        f.write('\n')    
 
 def calculate_B_field_line_diffusion(D):
     dimensions = 3
-    number_of_pairs = 30
-    number_of_steps = 20  # along B
-    number_of_separations = 2
-    inital_separations = linspace(
-        0.001,
-        0.004,
-        number_of_separations
-    )
+    number_of_pairs = 1000
+    number_of_steps = 1500  # along B
+    initial_separations = [1e-4, 5e-4, 1e-3, 5e-3]
+    number_of_separations = len(initial_separations)
+
+    # assumes that the grid separation is the same in all directions
+    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/10.
 
     average_diffusion_per_separation = []
-    for separation in inital_separations:
+    for separation in initial_separations:
         number_usable_pairs = 0
         average_diffusion = [
             range(0, number_of_steps),
@@ -302,7 +337,8 @@ def calculate_B_field_line_diffusion(D):
                     dimensions,
                     D,
                     separation,
-                    number_of_steps
+                    number_of_steps,
+                    step_length
                 )
             if step > -1:
                 diffusion = calculate_field_line_separation(
@@ -312,9 +348,9 @@ def calculate_B_field_line_diffusion(D):
                 add_result(number_of_steps, average_diffusion, diffusion)
                 number_usable_pairs += 1
 
-            # plot field lines
-            max_plot_number = -1
-            plot_number = 0
+            # plot field lines - mainly for testing purposes
+            max_plot_number = -1  # 2
+            plot_number = 1
             if dimensions == 2 and plot_number <= max_plot_number:
                 plot_field_lines(
                     D,
@@ -324,10 +360,14 @@ def calculate_B_field_line_diffusion(D):
             plot_number += 1
 
         average_diffusion_per_separation.append([
-            average_diffusion[0],
-            array(average_diffusion[1])/number_usable_pairs
+            (array(average_diffusion[0]) + 1.)*step_length,
+            sqrt(array(average_diffusion[1])/number_usable_pairs)
         ])
 
+    write_diffusion_to_file(
+    	number_of_separations,
+        average_diffusion_per_separation
+    )
     plot_diffusion(number_of_separations, average_diffusion_per_separation)
 
 
@@ -340,7 +380,10 @@ if __name__ == '__main__':
         axis,
         loglog,
         quiver,
-        show
+        savefig,
+        show,
+        xlabel,
+        ylabel
     )
     from numpy import (
         array,
@@ -354,7 +397,7 @@ if __name__ == '__main__':
     from pyPLUTO import pload
     from scipy.interpolate import RegularGridInterpolator
 
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/output/'
+    wdir = '/home/cronus/vorster/PLUTO/Shock_turbulence/output_15/'
     D = pload(0, w_dir=wdir)
 
     calculate_B_field_line_diffusion(D)
