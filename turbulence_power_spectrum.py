@@ -256,7 +256,7 @@ def velocity_turbulence_spectrum(D, num_sample_points):
     )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import os
     import pyPLUTO as pp
 
