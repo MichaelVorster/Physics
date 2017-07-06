@@ -289,7 +289,8 @@ def calculate_field_line_separation(dimensions, field_lines):
             separation_vector[dimension] = \
                 field_lines[1][dimension][step] - \
                 field_lines[0][dimension][step]
-        # separation_magnitude_squared = sum(square(separation_vector))
+        separation_magnitude_squared = sum(square(separation_vector))
+        '''
         if dimensions == 2:
             separation_perp_squared = square(separation_vector[1])
         if dimensions == 3:
@@ -297,9 +298,10 @@ def calculate_field_line_separation(dimensions, field_lines):
                 square(separation_vector[0]) +
                 square(separation_vector[2])
             )
+        '''
         diffusion[0].append(step)
-        # diffusion[1].append(separation_magnitude_squared)
-        diffusion[1].append(separation_perp_squared)
+        diffusion[1].append(separation_magnitude_squared)
+        # diffusion[1].append(separation_perp_squared)
 
     return diffusion
 
@@ -347,7 +349,11 @@ def add_result(number_of_steps, average_diffusion, diffusion):
     return average_diffusion
 
 
-def plot_diffusion(number_of_separations, average_diffusion_per_separation):
+def plot_diffusion(
+    number_of_separations,
+    average_diffusion_per_separation,
+    flow_position
+):
     Richardson_x = array(range(10, 100))*1e-3
     Richardson_y = power(Richardson_x, 1.5)*0.5
     Kolmogorov_x = array(range(10, 100))*1e-3
@@ -361,15 +367,16 @@ def plot_diffusion(number_of_separations, average_diffusion_per_separation):
     loglog(Kolmogorov_x, Kolmogorov_y)
     xlabel(r'Distance along B')
     ylabel(r'RMS separation of lines')
-    savefig('B_field_line_diffusion.png')
+    savefig(flow_position + '_B_field_line_diffusion.png')
     # show()
 
 
 def write_diffusion_to_file(
     number_of_separations,
-    average_diffusion_per_separation
+    average_diffusion_per_separation,
+    flow_position
 ):
-    f = open('diffusion_field_lines.txt', 'w')
+    f = open(flow_position + '_diffusion_field_lines.txt', 'w')
     f.write('Distance along B,    RMS separation of lines\n')
     f.write('\n')
     for separation in range(0, number_of_separations):
@@ -454,9 +461,14 @@ def calculate_B_field_line_diffusion(file_number, D, flow_position):
 
     write_diffusion_to_file(
         number_of_separations,
-        average_diffusion_per_separation
+        average_diffusion_per_separation,
+        flow_position
     )
-    plot_diffusion(number_of_separations, average_diffusion_per_separation)
+    plot_diffusion(
+        number_of_separations,
+        average_diffusion_per_separation,
+        flow_position
+    )
 
 
 if __name__ == '__main__':
