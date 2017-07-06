@@ -172,7 +172,7 @@ def get_grid_info(file_number, dimensions, D, flow_position, shock_index):
                 D.bx3[shock_index + offset:, :, :]
             ]
         if flow_position == 'downstream':
-            grid = [D.x1[:shock_index + offset + 1], D.x2, D.x3]
+            grid = [D.x1[:shock_index - offset + 1], D.x2, D.x3]
             B_component_array = [
                 D.bx1[:shock_index - offset + 1, :, :],
                 D.bx2[:shock_index - offset + 1, :, :],
