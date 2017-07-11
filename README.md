@@ -1,6 +1,6 @@
 # Turbulence analysis tools
 
-A coolection of tools to analyse the PLUTO simulation results.  The focus is specifically
+A collection of tools to analyse the PLUTO simulation results.  The focus is specifically
 on simulations where turbulence is present, although the tools could be used for other
 scnearios as well.
 
