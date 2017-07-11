@@ -58,3 +58,7 @@ only contain the data of a single variable
 ### `units.py`
 - Converts the program units used in PLUTO code to physical units
 
+### `conserved_variables.py`
+- compares the values of the flow variables (summed over the whole grid) at a specified simulation time with the initial values    
+- for periodic boundary conditions the variables should be conserved
+
