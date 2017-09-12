@@ -7,7 +7,7 @@ import array
 import numpy as np
 
 
-data_dir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b'
+data_dir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_22'
 file_time = '0000'
 
 input_file_name = 'data.' + file_time + '.dbl'

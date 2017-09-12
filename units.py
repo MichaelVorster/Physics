@@ -1,23 +1,36 @@
+# **************************
+# NB NB NB NB NB NB NB NB NB 
+# NB NB NB NB NB NB NB NB NB 
+
+# Both the AMUN code and PLUTO use a modified definition of the magnetic field
+# B = B/sqrt(4 pi)
+
+# NB NB NB NB NB NB NB NB NB 
+# NB NB NB NB NB NB NB NB NB 
+# **************************
+
+
 def calculate_physical_units():
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/output/'
+    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/output/'
 
     # normalisation factors
-    ISM_density = 1.0  # [particles per cm^3]
-    ISM_sound_speed = 10.  # [km/s]
-    ISM_size = 1.0  # [parsec]
+    ISM_density = 1.0*1.  # [particles per cm^3]
+    ISM_sound_speed = 10.*3.  # [km/s]
+    ISM_size = 1.0/25.  # [parsec]
 
     # AMUN: MHD code used to generate the turbulence field
     magnetic_field_AMUN = 0.1
     pressure_AMUN = 0.1
     density_AMUN = 1.
     sound_speed_AMUN = sqrt(pressure_AMUN/density_AMUN)
-    Alfven_speed_AMUN = magnetic_field_AMUN/sqrt(4.*3.1416*density_AMUN)
+    Alfven_speed_AMUN = magnetic_field_AMUN/sqrt(density_AMUN)  # SEE COMMENT AT TOP OF FILE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # PLUTO: MHD code used to calculate the MHD shock evolution
     pressure_PLUTO = 1.
     max_time_PLUTO = 0.1
     density_PLUTO = density_AMUN  # don't change for now
     sound_speed_PLUTO = sqrt(pressure_PLUTO/density_PLUTO)
+    grid_size_PLUTO = 1./1024.
 
     # the position of the shock at a given simulation time
     shock_position = 0.5
@@ -27,9 +40,11 @@ def calculate_physical_units():
     # code when importing the data into PLUTO as an initial condition
     velocity_scaling_factor = sound_speed_PLUTO/sound_speed_AMUN
     Alfven_speed_PLUTO = Alfven_speed_AMUN*velocity_scaling_factor
-    magnetic_field_PLUTO = Alfven_speed_PLUTO*sqrt(4.*3.1416*density_PLUTO)
+    magnetic_field_PLUTO = Alfven_speed_PLUTO*sqrt(density_PLUTO)  # SEE COMMENT AT TOP OF FILE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     mass_proton = 1.6726231e-24  # [g]
+    electron_charge = 4.803250e-10 # [esu]
+    speed_of_light = 2.99792458e10 # [cm]
     parsec = 3.086e18  # [cm]
     seconds_to_year = 60.*60.*24.*365.
     Gauss_to_microGauss = 1.0e6
@@ -45,12 +60,16 @@ def calculate_physical_units():
     time_normalisation_factor = (
         length_normalisation_factor/velocity_normalisation_factor
     )
-    # [Gauss]
+    # [Gauss] - [g^1/2 cm^(-1/2) s^(-1)]
     magnetic_field_normalisation_factor = sqrt(
         4.*3.1416*density_normalisation_factor*(
             velocity_normalisation_factor
         )**2
     )
+    # [g]
+    mass_normalisation_factor = density_normalisation_factor * length_normalisation_factor**3
+    # [esu] - [g^1/2 cm^3/2 s^(-1)]
+    charge_normalisation_factor = mass_normalisation_factor**0.5 * length_normalisation_factor**1.5 / time_normalisation_factor
 
     # [g/cm^3]
     density = density_PLUTO*density_normalisation_factor
@@ -68,6 +87,42 @@ def calculate_physical_units():
     )
     Mach_number = shock_speed/sound_speed
     Alfven_speed = magnetic_field/sqrt(4.*3.1416*density)
+
+
+    # The next section are the scaling factors between the PLUTO and test particle code
+    speed_light_PARTICLE = 1. # 100.
+    mass_charge_ratio_PARTICLE = 1. # 5e-8
+
+    speed_light_PLUTO = speed_of_light/velocity_normalisation_factor
+    mass_charge_ratio_PLUTO = (mass_proton/mass_normalisation_factor) / (electron_charge/charge_normalisation_factor)
+
+    length_normalisation_factor_PARTICLE = grid_size_PLUTO
+    velocity_normalisation_factor_PARTICLE = speed_light_PLUTO/speed_light_PARTICLE # average_alfven_speed_PLUTO / (Alfven_light_speed_ratio*speed_light_PARTICLE)
+    time_normalisation_factor_PARTICLE = length_normalisation_factor_PARTICLE/velocity_normalisation_factor_PARTICLE
+    mass_normalisation_factor_PARTICLE = (mass_charge_ratio_PLUTO/mass_charge_ratio_PARTICLE)**2 * (length_normalisation_factor_PARTICLE * velocity_normalisation_factor_PARTICLE**2)
+    charge_normalisation_factor_PARTICLE = mass_normalisation_factor_PARTICLE**0.5 * length_normalisation_factor_PARTICLE**1.5 / time_normalisation_factor_PARTICLE
+    magnetic_field_normalisation_factor_PARTICLE = mass_normalisation_factor_PARTICLE**0.5 / (length_normalisation_factor_PARTICLE**0.5 * time_normalisation_factor_PARTICLE)
+
+    print('V field normalisation ', velocity_normalisation_factor_PARTICLE)
+    print('B field normalisation ', magnetic_field_normalisation_factor_PARTICLE/sqrt(4.*3.14))
+    print('Time normalisation    ', time_normalisation_factor_PARTICLE) 
+
+    # test conversion factors - gyroradius of a particle compared to grid size should be the same in both PLUTO and PARTICLE code
+    # NB NB NB NB NB - remember that PLUTO actually includes the square root of 4*pi into the definition of B.  This should be taken into account
+    # when running the particle code
+    gamma = 1.e2
+    example_B_field_PLUTO = 1.
+    example_speed_PLUTO = speed_light_PLUTO*sqrt(1 - 1./(gamma**2))
+    gyro_radius_PLUTO = gamma*mass_charge_ratio_PLUTO*example_speed_PLUTO*speed_light_PLUTO/example_B_field_PLUTO
+
+    example_speed_PARTICLE = example_speed_PLUTO/velocity_normalisation_factor_PARTICLE
+    example_B_field_PARTICLE = example_B_field_PLUTO/magnetic_field_normalisation_factor_PARTICLE
+    gyro_radius_PARTICLE = gamma*mass_charge_ratio_PARTICLE*example_speed_PARTICLE*speed_light_PARTICLE/example_B_field_PARTICLE
+    
+    print('Gyroradii test:')
+    print('PLUTO:   ', gyro_radius_PLUTO/grid_size_PLUTO)
+    print('Particle:', gyro_radius_PARTICLE)
+
 
     print('\n')
     print('Code units')
@@ -134,6 +189,6 @@ def calculate_physical_units():
 
 
 if __name__ == "__main__":
-    from numpy import sqrt
+    from numpy import sqrt, power
 
     physical_units = calculate_physical_units()

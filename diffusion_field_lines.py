@@ -5,7 +5,7 @@
 #
 # AUTHOR: Michael Vorster
 #
-# LAST UPDATED: 05 July 2017
+# LAST UPDATED: 07 September 2017
 
 
 from math import (
@@ -23,6 +23,7 @@ from matplotlib.pyplot import (
 )
 from numpy import (
     array,
+    mod,
     power,
     random,
     square,
@@ -43,7 +44,7 @@ def select_starting_positions(dimensions, nx, grid_min, grid_max, separation):
     if dimensions == 2:
         theta = 3.14159/2.
     if dimensions == 3:
-        theta = random.random()*3.14159
+        theta = random.random()*3.14159/2.
 
     dx = [
         separation*cos(phi)*sin(theta),
@@ -79,7 +80,8 @@ def calculate_next_position(
     B_field,
     step_length,
     grid_min,
-    grid_max
+    grid_max,
+    file_number
 ):
     out_of_domain = 0
     B_dot_product = 0
@@ -93,9 +95,12 @@ def calculate_next_position(
         step = B_field[dimension][0]*step_length/B_magnitude
         next_position[dimension] = starting_position[dimension] + step
 
-        if next_position[dimension] < grid_min[dimension] or \
-            next_position[dimension] > grid_max[dimension]:
-                out_of_domain = 1
+    # periodic boundaries in y and z, and in x when t = 0
+    #   (just be careful about the pressure wave at inner
+    #   boundary for PLUTO simulations)
+    if file_number > 0:
+        if next_position[0] < grid_min[0] or next_position[0] > grid_max[0]:
+            out_of_domain = 1
 
     return next_position, out_of_domain
 
@@ -108,14 +113,46 @@ def point_in_domain(positions, grid_min, grid_max):
     return in_domain
 
 
-def interpolate_magnetic_field(dimensions, grid, B_component_array, position):
+def interpolate_magnetic_field(
+    dimensions,
+    grid,
+    B_component_array,
+    position,
+    file_number
+):
     B_field = [0.]*dimensions
+    position_temp = [0.]*dimensions
+
+    # periodic boundaries along y and z (and x at t = 0) are taken into account
+    dimensions_range = range(1, dimensions)
+    if file_number == 0 or dimensions == 2:
+        dimensions_range = range(0, dimensions)
+
+    # periodic boundaries along y and z (and x at t = 0) are taken into account
+    for dimension in dimensions_range:
+        max_grid = max(grid[dimension])
+        min_grid = min(grid[dimension])
+        grid_extension = max_grid - min_grid
+        if position[dimension] > max_grid:
+            correction = mod(
+                abs(position[dimension] - max_grid), grid_extension
+            )
+            position_temp[dimension] = min_grid + correction
+        elif position[dimension] < min_grid:
+            # inner boundary is not at zero
+            correction = mod(
+                abs(position[dimension] - min_grid), grid_extension
+            )
+            position_temp[dimension] = max_grid - correction
+        else:
+            position_temp[dimension] = position[dimension]
+
     for dimension in range(0, dimensions):
         interpolate_b = RegularGridInterpolator(
             points=grid,
             values=B_component_array[dimension]
         )
-        B_field[dimension] = interpolate_b(position)
+        B_field[dimension] = interpolate_b(position_temp)
 
     return B_field
 
@@ -210,7 +247,7 @@ def construct_field_lines(
         grid_max,
         separation
     )
-    # starting_positions = [[0.06, 0.06], [0.066, 0.06]]
+    # starting_positions = [[0.01, 0.124], [0.016, 0.124]]
 
     B_field = [[], []]
     for i in (0, 1):
@@ -218,7 +255,8 @@ def construct_field_lines(
             dimensions,
             grid,
             B_component_array,
-            starting_positions[i]
+            starting_positions[i],
+            file_number
         )
 
     field_line_coordinates = [[], []]
@@ -238,7 +276,8 @@ def construct_field_lines(
                 B_field[point],
                 step_length,
                 grid_min,
-                grid_max
+                grid_max,
+                file_number
             )
 
             if out_of_domain:
@@ -258,7 +297,8 @@ def construct_field_lines(
                 dimensions,
                 grid,
                 B_component_array,
-                next_position
+                next_position,
+                file_number
             )
             starting_positions[point] = next_position[:]
 
@@ -313,8 +353,26 @@ def plot_field_lines(
     x_slice,
     flow_position
 ):
-    begin = 50
-    end = 80
+    begin = 1
+    end = 128
+
+    field_line_coordinates_plot_y = field_line_coordinates[:][0]
+    field_line_coordinates_plot_z = field_line_coordinates[:][1]
+    for i in (0, 1):
+        length = len(field_line_coordinates_plot_y[i])
+        for j in range(0, length):
+            y = field_line_coordinates_plot_y[i][j]
+            z = field_line_coordinates_plot_z[i][j]
+            if y < min(D.x2):
+                y = max(D.x2) + (y - min(D.x2))
+            if y > max(D.x2):
+                y = min(D.x2) + (y - max(D.x2))
+            if z < min(D.x3):
+                z = max(D.x3) + (z - min(D.x3))
+            if z > max(D.x3):
+                z = min(D.x3) + (z - max(D.x3))
+            field_line_coordinates_plot_y[i][j] = y
+            field_line_coordinates_plot_z[i][j] = z
 
     axis('equal')
     quiver(
@@ -326,17 +384,17 @@ def plot_field_lines(
     )
 
     colour = ['g', 'b']
-    for i in (0, 1):
+    for i in (0, 0):
         axis('equal')
         quiver(
-            field_line_coordinates[i][0],
-            field_line_coordinates[i][1],
+            field_line_coordinates_plot_y[0],
+            field_line_coordinates_plot_z[1],
             field_line_components[i][0],
             field_line_components[i][1],
             units='xy',
             color=colour[i]
         )
-
+        # axis([0, 0.025, 0, 0.025])
     show()
 
 
@@ -377,8 +435,8 @@ def write_diffusion_to_file(
     flow_position
 ):
     f = open(flow_position + '_diffusion_field_lines.txt', 'w')
-    f.write('Distance along B,    RMS separation of lines\n')
-    f.write('\n')
+    # f.write('Distance along B,    RMS separation of lines\n')
+    # f.write('\n')
     for separation in range(0, number_of_separations):
         number_of_steps = len(
             average_diffusion_per_separation[separation][0]
@@ -390,26 +448,30 @@ def write_diffusion_to_file(
                     average_diffusion_per_separation[separation][1][step]
                 )
             )
-        f.write('\n')
+        f.write('\n')  # NB to have another empty line
 
 
 def calculate_B_field_line_diffusion(file_number, D, flow_position):
     dimensions = 3
     number_of_pairs = 1000
-    number_of_steps = 1500  # along B
+    number_of_steps = 1000  # along B
     initial_separations = [1e-4, 5e-4, 1e-3, 5e-3]
     number_of_separations = len(initial_separations)
     # assumes that the grid size is the same in all directions
-    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/10.
+    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/2.
     max_plot_number = -1
 
-    shock_index = locate_shock(D)
+    if file_number > 0:
+        shock_index = locate_shock(D)
+    else:
+        shock_index = 0
 
+    # set 'test = True' for testing
     test = False
     if test:
         dimensions = 2
         number_of_pairs = 1
-        number_of_steps = 10  # along B
+        number_of_steps = 30  # along B
         step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/1.
         initial_separations = [1e-3]
         number_of_separations = len(initial_separations)
@@ -423,6 +485,7 @@ def calculate_B_field_line_diffusion(file_number, D, flow_position):
             [0]*number_of_steps
         ]
         for pair in range(0, number_of_pairs):
+            print(separation, pair)
             field_line_coordinates, field_line_components, step, x_slice = \
                 construct_field_lines(
                     file_number,
@@ -472,15 +535,16 @@ def calculate_B_field_line_diffusion(file_number, D, flow_position):
 
 
 if __name__ == '__main__':
-    file_number = 9
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15/output/'
-    # wdir = '/home/cronus/vorster/PLUTO/Shock_turbulence/output_15/'
-    D = pload(file_number, w_dir=wdir)
-
     # flow_position: upstream or downstream of shock.  Options are:
     #                'upstream'
     #                'downstream'
     flow_position = 'downstream'
+    file_number = 0
+    # wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/output/'
+    wdir = '/home/cronus/vorster/PLUTO/Shock_turbulence/turbulence_only_output/'
+
+    D = pload(file_number, w_dir=wdir)
+
     if file_number == 0:
         flow_position = 'upstream'  # no shock at time = 0
 

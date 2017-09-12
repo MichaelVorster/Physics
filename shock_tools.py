@@ -169,8 +169,8 @@ def remove_average_fluid_component(D, fluid_quantity, shock_index):
 
 
 if __name__ == '__main__':
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15/output/'
-    file_time = 9
+    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/output/'
+    file_time = 7
     D = pp.pload(file_time, w_dir=wdir)
 
     # flow_quantity: options are
@@ -179,6 +179,7 @@ if __name__ == '__main__':
     #                'magnetic field'
     flow_quantity = 'magnetic field'
 
-    # shock_index = locate_shock(D)
-    shock_index = 502
-    remove_average_fluid_component(D, flow_quantity, shock_index)
+    shock_index = locate_shock(D)
+    print(shock_index)
+    # shock_index = 502
+    # remove_average_fluid_component(D, flow_quantity, shock_index)
