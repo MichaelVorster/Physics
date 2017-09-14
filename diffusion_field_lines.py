@@ -22,6 +22,7 @@ from matplotlib.pyplot import (
     ylabel
 )
 from numpy import (
+    arccos,
     array,
     mod,
     power,
@@ -320,28 +321,42 @@ def construct_field_lines(
     ]
 
 
-def calculate_field_line_separation(dimensions, field_lines):
+def calculate_field_line_separation(
+    dimensions,
+    field_line_coordinates,
+    field_line_components
+):
     diffusion = [[], []]
-    number_of_steps = len(field_lines[0][0])
+    number_of_steps = len(field_line_coordinates[0][0])
+
     for step in range(0, number_of_steps):
+        B_average = array([0.]*dimensions)
         separation_vector = array([0.]*dimensions)
+        dot_product = 0.
+
         for dimension in range(0, dimensions):
+            B_average[dimension] = (
+                field_line_components[0][dimension][step] + 
+                field_line_components[1][dimension][step]
+            )/2.
+
             separation_vector[dimension] = \
-                field_lines[1][dimension][step] - \
-                field_lines[0][dimension][step]
-        separation_magnitude_squared = sum(square(separation_vector))
-        '''
-        if dimensions == 2:
-            separation_perp_squared = square(separation_vector[1])
-        if dimensions == 3:
-            separation_perp_squared = (
-                square(separation_vector[0]) +
-                square(separation_vector[2])
-            )
-        '''
+                field_line_coordinates[1][dimension][step] - \
+                field_line_coordinates[0][dimension][step]
+
+            dot_product = dot_product \
+                + B_average[dimension]*separation_vector[dimension]
+
+        B_average_magnitude = sqrt(sum(square(B_average)))         
+        separation_magnitude = sqrt(sum(square(separation_vector)))
+        theta = arccos(
+            dot_product/(B_average_magnitude*separation_magnitude)
+        )
+        separation_perp_squared = square(separation_magnitude*sin(theta))
+
         diffusion[0].append(step)
-        diffusion[1].append(separation_magnitude_squared)
-        # diffusion[1].append(separation_perp_squared)
+        # diffusion[1].append(separation_magnitude_squared)
+        diffusion[1].append(separation_perp_squared)
 
     return diffusion
 
@@ -454,8 +469,8 @@ def write_diffusion_to_file(
 def calculate_B_field_line_diffusion(file_number, D, flow_position):
     dimensions = 3
     number_of_pairs = 1000
-    number_of_steps = 1000  # along B
-    initial_separations = [1e-4, 5e-4, 1e-3, 5e-3]
+    number_of_steps = 2000  # along B
+    initial_separations = [1e-3, 2e-3, 1e-2, 2e-2]
     number_of_separations = len(initial_separations)
     # assumes that the grid size is the same in all directions
     step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/2.
@@ -500,7 +515,8 @@ def calculate_B_field_line_diffusion(file_number, D, flow_position):
             if step > -1:
                 diffusion = calculate_field_line_separation(
                     dimensions,
-                    field_line_coordinates
+                    field_line_coordinates,
+                    field_line_components
                 )
                 add_result(number_of_steps, average_diffusion, diffusion)
                 number_usable_pairs += 1
@@ -540,10 +556,11 @@ if __name__ == '__main__':
     #                'downstream'
     flow_position = 'downstream'
     file_number = 0
-    # wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/output/'
-    wdir = '/home/cronus/vorster/PLUTO/Shock_turbulence/turbulence_only_output/'
+    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/output/'
+    # wdir = '/home/cronus/vorster/PLUTO/Shock_turbulence/turbulence_only_output/'
+    wdir = '/home/mvorster/Heshou_data/'
 
-    D = pload(file_number, w_dir=wdir)
+    D = pload(file_number, w_dir=wdir, datatype='float')
 
     if file_number == 0:
         flow_position = 'upstream'  # no shock at time = 0
