@@ -63,7 +63,7 @@ def locate_shock(D):
     for variable in variables:
         avrg_qx = [0]*nx
         for j in range(0, nx):
-            avrg_qx[i] = average(variable[:, j, :])
+            avrg_qx[j] = average(variable[:, j, :])
         avrg_variables.append(avrg_qx)
 
     avrg_shock_index_variables = []
