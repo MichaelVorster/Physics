@@ -44,27 +44,34 @@ def locate_shock(D):
         square(D.bx2) +
         square(D.bx3)
     )
+    pressure = D.prs
     variables = [
         density,
         velocity,
         magnetic_field
     ]
-    nx = len(D.x1)
+
+    # using just pressure for bx0.8_cs1.35 seems sufficient
+    variables = [
+        pressure
+    ]
+
+    nx = len(D.x2)
 
     # average over y and z directions
     avrg_variables = []
     for variable in variables:
         avrg_qx = [0]*nx
-        for i in range(0, nx):
-            avrg_qx[i] = average(variable[i, :, :])
+        for j in range(0, nx):
+            avrg_qx[i] = average(variable[:, j, :])
         avrg_variables.append(avrg_qx)
 
     avrg_shock_index_variables = []
     for avrg_variable in avrg_variables:
         shock_index = []
-        n = 3
+        n = 10
         dn = 0
-        dn_max = 30
+        dn_max = 50
         initial_estimate = argmax(avrg_variable)
         ratio = []
         while dn < dn_max:
