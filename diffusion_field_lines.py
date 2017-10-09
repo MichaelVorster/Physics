@@ -8,6 +8,12 @@
 # LAST UPDATED: 09 October 2017
 
 
+# If shock is along x-axis, the following changes are needed 
+# (might be incomplete):
+# Line 127 and 132
+# In 'get_grid_info', especially the array slices
+
+
 from math import (
     sin,
     cos
@@ -91,11 +97,9 @@ def calculate_next_position(
         step = B_field[dimension][0]*step_length/B_magnitude
         next_position[dimension] = starting_position[dimension] + step
 
-    # periodic boundaries in y and z, and in x when t = 0
-    #   (just be careful about the pressure wave at inner
-    #   boundary for PLUTO simulations)
+    # periodic boundaries in x and z, and in y when no shock is present
     if shock_index > 0:
-        if next_position[0] < grid_min[0] or next_position[0] > grid_max[0]:
+        if next_position[1] < grid_min[1] or next_position[1] > grid_max[1]:
             out_of_domain = 1
 
     return next_position, out_of_domain
@@ -119,12 +123,13 @@ def interpolate_magnetic_field(
     B_field = [0.]*dimensions
     position_temp = [0.]*dimensions
 
-    # periodic boundaries along y and z (and x if no shock is present)
-    dimensions_range = range(1, dimensions)
+    # periodic boundaries along x and z (and y if no shock is present)
+    dimensions_range = [0, 2]
     if shock_index == 0 or dimensions == 2:
         dimensions_range = range(0, dimensions)
 
     # periodic boundaries along y and z (and x if no shock is present)
+    position_temp[1] = position[1]
     for dimension in dimensions_range:
         max_grid = max(grid[dimension])
         min_grid = min(grid[dimension])
@@ -524,7 +529,7 @@ if __name__ == '__main__':
     #                'downstream'
     flow_position = 'upstream'
     file_number = 4
-    wdir = '/home/cronus/vorster/B_shock_turbulence/bx0.8_cs1.35/'
+    wdir = '/home/mvorster/PLUTO/B_Shock_turbulence/bx0.8_cs1.35'
     shock_present = 1
 
     if not wdir[-1] == '/':
