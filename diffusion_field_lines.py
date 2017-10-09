@@ -451,7 +451,7 @@ def calculate_B_field_line_diffusion(
     initial_separations = [1e-3, 2e-3, 1e-2, 2e-2]
     number_of_separations = len(initial_separations)
     # assumes that the grid size is the same in all directions
-    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/0.5
+    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/1.
     max_plot_number = -1
 
     if shock_present:
