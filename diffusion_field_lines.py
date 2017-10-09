@@ -5,7 +5,7 @@
 #
 # AUTHOR: Michael Vorster
 #
-# LAST UPDATED: 07 September 2017
+# LAST UPDATED: 09 October 2017
 
 
 from math import (
@@ -14,18 +14,13 @@ from math import (
 )
 from matplotlib.pyplot import (
     axis,
-    loglog,
     quiver,
-    savefig,
-    show,
-    xlabel,
-    ylabel
+    show
 )
 from numpy import (
     arccos,
     array,
     mod,
-    power,
     random,
     square,
     sqrt
@@ -82,7 +77,7 @@ def calculate_next_position(
     step_length,
     grid_min,
     grid_max,
-    file_number
+    shock_index
 ):
     out_of_domain = 0
     B_dot_product = 0
@@ -99,7 +94,7 @@ def calculate_next_position(
     # periodic boundaries in y and z, and in x when t = 0
     #   (just be careful about the pressure wave at inner
     #   boundary for PLUTO simulations)
-    if file_number > 0:
+    if shock_index > 0:
         if next_position[0] < grid_min[0] or next_position[0] > grid_max[0]:
             out_of_domain = 1
 
@@ -119,17 +114,17 @@ def interpolate_magnetic_field(
     grid,
     B_component_array,
     position,
-    file_number
+    shock_index
 ):
     B_field = [0.]*dimensions
     position_temp = [0.]*dimensions
 
-    # periodic boundaries along y and z (and x at t = 0) are taken into account
+    # periodic boundaries along y and z (and x if no shock is present)
     dimensions_range = range(1, dimensions)
-    if file_number == 0 or dimensions == 2:
+    if shock_index == 0 or dimensions == 2:
         dimensions_range = range(0, dimensions)
 
-    # periodic boundaries along y and z (and x at t = 0) are taken into account
+    # periodic boundaries along y and z (and x if no shock is present)
     for dimension in dimensions_range:
         max_grid = max(grid[dimension])
         min_grid = min(grid[dimension])
@@ -170,13 +165,9 @@ def remove_additional_point(
         field_line_components[0][dimension].pop()
 
 
-def get_grid_info(file_number, dimensions, D, flow_position, shock_index):
-    if file_number == 0:
+def get_grid_info(dimensions, D, flow_position, shock_index):
+    if shock_index == 0:
         offset = 0
-        if flow_position == 'upstream':
-            shock_index = 0
-        if flow_position == 'downstream':
-            shock_index = max(D.x1)
 
     # for plotting purposes arrays must have same dimensions.
     # Only x2 and x3 have the same dimensions. Slice is thus taken in
@@ -229,7 +220,6 @@ def get_grid_info(file_number, dimensions, D, flow_position, shock_index):
 
 
 def construct_field_lines(
-    file_number,
     dimensions,
     D,
     separation,
@@ -239,7 +229,7 @@ def construct_field_lines(
     shock_index
 ):
     nx, grid, grid_min, grid_max, B_component_array, x_slice = \
-        get_grid_info(file_number, dimensions, D, flow_position, shock_index)
+        get_grid_info(dimensions, D, flow_position, shock_index)
 
     starting_positions = select_starting_positions(
         dimensions,
@@ -257,7 +247,7 @@ def construct_field_lines(
             grid,
             B_component_array,
             starting_positions[i],
-            file_number
+            shock_index
         )
 
     field_line_coordinates = [[], []]
@@ -278,7 +268,7 @@ def construct_field_lines(
                 step_length,
                 grid_min,
                 grid_max,
-                file_number
+                shock_index
             )
 
             if out_of_domain:
@@ -299,7 +289,7 @@ def construct_field_lines(
                 grid,
                 B_component_array,
                 next_position,
-                file_number
+                shock_index
             )
             starting_positions[point] = next_position[:]
 
@@ -336,7 +326,7 @@ def calculate_field_line_separation(
 
         for dimension in range(0, dimensions):
             B_average[dimension] = (
-                field_line_components[0][dimension][step] + 
+                field_line_components[0][dimension][step] +
                 field_line_components[1][dimension][step]
             )/2.
 
@@ -347,7 +337,7 @@ def calculate_field_line_separation(
             dot_product = dot_product \
                 + B_average[dimension]*separation_vector[dimension]
 
-        B_average_magnitude = sqrt(sum(square(B_average)))         
+        B_average_magnitude = sqrt(sum(square(B_average)))   
         separation_magnitude = sqrt(sum(square(separation_vector)))
         theta = arccos(
             dot_product/(B_average_magnitude*separation_magnitude)
@@ -422,34 +412,13 @@ def add_result(number_of_steps, average_diffusion, diffusion):
     return average_diffusion
 
 
-def plot_diffusion(
-    number_of_separations,
-    average_diffusion_per_separation,
-    flow_position
-):
-    Richardson_x = array(range(10, 100))*1e-3
-    Richardson_y = power(Richardson_x, 1.5)*0.5
-    Kolmogorov_x = array(range(10, 100))*1e-3
-    Kolmogorov_y = power(Kolmogorov_x, 0.5)*0.2
-    for separation in range(0, number_of_separations):
-        loglog(
-            average_diffusion_per_separation[separation][0],
-            average_diffusion_per_separation[separation][1]
-        )
-    loglog(Richardson_x, Richardson_y)
-    loglog(Kolmogorov_x, Kolmogorov_y)
-    xlabel(r'Distance along B')
-    ylabel(r'RMS separation of lines')
-    savefig(flow_position + '_B_field_line_diffusion.png')
-    # show()
-
-
 def write_diffusion_to_file(
     number_of_separations,
     average_diffusion_per_separation,
-    flow_position
+    flow_position,
+    wdir
 ):
-    f = open(flow_position + '_diffusion_field_lines.txt', 'w')
+    f = open(wdir + flow_position + '_diffusion_field_lines.txt', 'w')
     # f.write('Distance along B,    RMS separation of lines\n')
     # f.write('\n')
     for separation in range(0, number_of_separations):
@@ -466,17 +435,22 @@ def write_diffusion_to_file(
         f.write('\n')  # NB to have another empty line
 
 
-def calculate_B_field_line_diffusion(file_number, D, flow_position):
+def calculate_B_field_line_diffusion(
+    D,
+    flow_position,
+    shock_present,
+    wdir
+):
     dimensions = 3
     number_of_pairs = 1000
-    number_of_steps = 2000  # along B
+    number_of_steps = 1000  # along B
     initial_separations = [1e-3, 2e-3, 1e-2, 2e-2]
     number_of_separations = len(initial_separations)
     # assumes that the grid size is the same in all directions
-    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/2.
+    step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/0.5
     max_plot_number = -1
 
-    if file_number > 0:
+    if shock_present:
         shock_index = locate_shock(D)
     else:
         shock_index = 0
@@ -503,7 +477,6 @@ def calculate_B_field_line_diffusion(file_number, D, flow_position):
             print(separation, pair)
             field_line_coordinates, field_line_components, step, x_slice = \
                 construct_field_lines(
-                    file_number,
                     dimensions,
                     D,
                     separation,
@@ -541,12 +514,8 @@ def calculate_B_field_line_diffusion(file_number, D, flow_position):
     write_diffusion_to_file(
         number_of_separations,
         average_diffusion_per_separation,
-        flow_position
-    )
-    plot_diffusion(
-        number_of_separations,
-        average_diffusion_per_separation,
-        flow_position
+        flow_position,
+        wdir
     )
 
 
@@ -554,15 +523,22 @@ if __name__ == '__main__':
     # flow_position: upstream or downstream of shock.  Options are:
     #                'upstream'
     #                'downstream'
-    flow_position = 'downstream'
-    file_number = 0
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/output/'
-    # wdir = '/home/cronus/vorster/PLUTO/Shock_turbulence/turbulence_only_output/'
-    wdir = '/home/mvorster/Heshou_data/'
+    flow_position = 'upstream'
+    file_number = 4
+    wdir = '/home/cronus/vorster/B_shock_turbulence/bx0.8_cs1.35/'
+    shock_present = 1
 
-    D = pload(file_number, w_dir=wdir, datatype='float')
+    if not wdir[-1] == '/':
+        wdir = wdir + '/'
 
-    if file_number == 0:
-        flow_position = 'upstream'  # no shock at time = 0
+    D = pload(file_number, w_dir=wdir+'output/')
 
-    calculate_B_field_line_diffusion(file_number, D, flow_position)
+    if not shock_present:
+        flow_position = 'upstream'
+
+    calculate_B_field_line_diffusion(
+        D,
+        flow_position,
+        shock_present,
+        wdir
+    )
