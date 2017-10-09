@@ -169,43 +169,42 @@ def get_grid_info(dimensions, D, flow_position, shock_index):
     if shock_index == 0:
         offset = 0
 
-    # for plotting purposes arrays must have same dimensions.
-    # Only x2 and x3 have the same dimensions. Slice is thus taken in
-    # x-y plane.
+    # For plotting purposes arrays must have same dimensions.  Choose
+    # plotting plane to have the same dimensions.
     if dimensions == 2:
         offset = 10
         if flow_position == 'upstream':
-            if len(D.x1)/2 > shock_index:
-                x_slice = len(D.x1)/2
+            if len(D.x2)/2 > shock_index:
+                y_slice = len(D.x2)/2
             else:
                 # don't take slice at shock position
-                x_slice = shock_index + offset
+                y_slice = shock_index + offset
         if flow_position == 'downstream':
-            if len(D.x1)/2 < shock_index:
-                x_slice = len(D.x1)/2
+            if len(D.x2)/2 < shock_index:
+                y_slice = len(D.x2)/2
             else:
                 # don't take slice at shock position
-                x_slice = shock_index - offset
-        grid = [D.x2, D.x3]
-        B_component_array = [D.bx2[x_slice, :, :], D.bx3[x_slice, :, :]]
+                y_slice = shock_index - offset
+        grid = [D.x1, D.x3]
+        B_component_array = [D.bx1[:, y_slice, :], D.bx3[:, y_slice, :]]
     if dimensions == 3:
-        x_slice = -1  # not needed for 3D calculations
+        y_slice = -1  # not needed for 3D calculations
         # construct field lines a region that starts/ends a couple of grid
         # points beyond or before shock
         offset = 5
         if flow_position == 'upstream':
-            grid = [D.x1[shock_index + offset:], D.x2, D.x3]
+            grid = [D.x1, D.x2[shock_index + offset:], D.x3]
             B_component_array = [
-                D.bx1[shock_index + offset:, :, :],
-                D.bx2[shock_index + offset:, :, :],
-                D.bx3[shock_index + offset:, :, :]
+                D.bx1[:, shock_index + offset, :],
+                D.bx2[:, shock_index + offset, :],
+                D.bx3[:, shock_index + offset, :]
             ]
         if flow_position == 'downstream':
-            grid = [D.x1[:shock_index - offset + 1], D.x2, D.x3]
+            grid = [D.x1, D.x2[:shock_index - offset + 1], D.x3]
             B_component_array = [
-                D.bx1[:shock_index - offset + 1, :, :],
-                D.bx2[:shock_index - offset + 1, :, :],
-                D.bx3[:shock_index - offset + 1, :, :]
+                D.bx1[:, :shock_index - offset + 1, :],
+                D.bx2[:, :shock_index - offset + 1, :],
+                D.bx3[:, :shock_index - offset + 1, :]
             ]
 
     nx = [0]*dimensions
