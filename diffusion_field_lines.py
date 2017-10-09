@@ -195,9 +195,9 @@ def get_grid_info(dimensions, D, flow_position, shock_index):
         if flow_position == 'upstream':
             grid = [D.x1, D.x2[shock_index + offset:], D.x3]
             B_component_array = [
-                D.bx1[:, shock_index + offset, :],
-                D.bx2[:, shock_index + offset, :],
-                D.bx3[:, shock_index + offset, :]
+                D.bx1[:, shock_index + offset:, :],
+                D.bx2[:, shock_index + offset:, :],
+                D.bx3[:, shock_index + offset:, :]
             ]
         if flow_position == 'downstream':
             grid = [D.x1, D.x2[:shock_index - offset + 1], D.x3]
