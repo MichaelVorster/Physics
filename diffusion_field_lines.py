@@ -215,7 +215,7 @@ def get_grid_info(dimensions, D, flow_position, shock_index):
         grid_min[dimension] = min(grid[dimension])
         grid_max[dimension] = max(grid[dimension])
 
-    return nx, grid, grid_min, grid_max, B_component_array, x_slice
+    return nx, grid, grid_min, grid_max, B_component_array, y_slice
 
 
 def construct_field_lines(
