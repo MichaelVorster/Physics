@@ -141,7 +141,8 @@ def average_fluid_field(
     fluid_quantity,
     shock_index,
     shock_direction,
-    wdir
+    wdir,
+    plot_averages
 ):
     avrg_qx = [0]*nx
     for index in range(0, nx):
@@ -169,16 +170,17 @@ def average_fluid_field(
     for index in range(shock_index, nx):
         avrg_fitted[index] = upstream_fit
 
-    plot_average_fluid_field(
-        D,
-        x_grid,
-        qx,
-        avrg_qx,
-        avrg_fitted,
-        fluid_quantity,
-        shock_direction,
-        wdir
-    )
+    if plot_averages:
+        plot_average_fluid_field(
+            D,
+            x_grid,
+            qx,
+            avrg_qx,
+            avrg_fitted,
+            fluid_quantity,
+            shock_direction,
+            wdir
+        )
 
     return avrg_fitted
 
@@ -188,7 +190,8 @@ def remove_average_fluid_component(
     fluid_quantity,
     shock_index,
     shock_direction,
-    wdir
+    wdir,
+    plot_averages
 ):
     nx = len(getattr(D, shock_direction))
     del_qx = []
@@ -234,7 +237,8 @@ def remove_average_fluid_component(
             qx_title[component],
             shock_index,
             shock_direction,
-            wdir
+            wdir,
+            plot_averages
         )
 
         del_component = array(list(qx[component]))
@@ -272,6 +276,8 @@ if __name__ == '__main__':
     # shock_direction = 'x2'
     # shock_index = 260
 
+    plot_averages = 1
+
     if not wdir[-1] == '/':
         wdir = wdir + '/'
     D = pp.pload(file_time, w_dir=wdir + 'output/')
@@ -285,5 +291,6 @@ if __name__ == '__main__':
             flow_quantity,
             shock_index,
             shock_direction,
-            wdir
+            wdir,
+            plot_averages
         )

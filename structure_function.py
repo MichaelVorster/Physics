@@ -7,6 +7,8 @@
 # Author: Michael Vorster
 # Last updated: 16 June 2017
 
+import os
+import pyPLUTO as pp
 from fitcurve import savitzky_golay
 from numpy import (
     argmax,
@@ -23,23 +25,58 @@ from matplotlib.pyplot import (
     xlabel,
     ylabel
 )
+from shock_tools import (
+    locate_shock,
+    remove_average_fluid_component
+)
 
 
-def grid_info(D):
-    # Number of dimensions
+def grid_info(
+    D,
+    shock_index,
+    shock_direction,
+    region
+):
+    offset = 10
     dimensions = 3
-    nx = (len(D.x1), len(D.x2), len(D.x3))
-    dx = [
-        (max(D.x1) - min(D.x1))/(nx[0] - 1.),
-        (max(D.x2) - min(D.x2))/(nx[1] - 1.),
-        (max(D.x3) - min(D.x3))/(nx[2] - 1.)
-    ]
-    # we will only sample points that are not more than half a grid size
-    # separated.  If grid does not have an equal size in all directions,
-    # then the step size is determined by the smallest grid direction
+
+    if region == 'upstream':
+        if shock_direction == 'x1':
+            grid = [D.x1[shock_index + offset:], D.x2, D.x3]
+        elif shock_direction == 'x2':
+            grid = [D.x1, D.x2[shock_index + offset:], D.x3]
+        else:
+            grid = [D.x1, D.x2, D.x3[shock_index + offset:]]    
+    elif region == 'downstream':
+        if shock_direction == 'x1':
+            grid = [D.x1[:shock_index - offset + 1], D.x2, D.x3]
+        elif shock_direction == 'x2':
+            grid = [D.x1, D.x2[:shock_index - offset + 1], D.x3]
+        else:
+            grid = [D.x1, D.x2, D.x3[:shock_index - offset + 1]]
+    else:
+        grid = [D.x1, D.x2, D.x3]
+
+    nx = (len(grid[0]), len(grid[1]), len(grid[2]))
+    # we will only sample points that are separated by a distance that is
+    # equal to (or less) than half the size of the region under consideration
     max_step_size = min(nx)/2
 
-    return dimensions, nx, dx, max_step_size
+    return dimensions, nx, max_step_size
+
+
+def limit_quantity_to_region(
+    del_qx,
+    region,
+    nx
+):
+    for i in range(len(del_qx)):
+        if region == 'upstream':
+            del_qx[i] = del_qx[i][-nx[0]:, -nx[1]:, -nx[2]:]
+        elif region == 'downstream':
+            del_qx[i] = del_qx[i][0:nx[0], 0:nx[1], 0:nx[2]]
+
+    return del_qx
 
 
 # Select step direction
@@ -56,46 +93,6 @@ def select_step_direction(dimensions, step_size):
         d_index[index-1] = 1*step_size
 
     return d_index
-
-
-# Calculate the average profile of a fluid quantity along the x-axis, i.e.,
-# the fluid quantity is averaged along the y- and z-axes.  In general the
-# averaged profile will not be smooth.  Therefore, it is necessary to fit a
-# smooth function to the profile.  However, the presence of a shock complicates
-# the problem.
-#
-# The approach is to fit the shocked region with a smooth curve.  Upstream of
-# the shock the fluid quantity is again averaged, but this time over all axes.
-# The second averaging should ensure a smooth profile upstream of the shock.
-def average_fluid_field(x1, qx, nx, fluid_quantity):
-    avrg_qx = [0]*nx[0]
-    for i in range(0, nx[0]):
-        avrg_qx[i] = average(qx[i, :, :])
-
-    original_profile = list(avrg_qx)
-
-    # it is usefule to fit the data a few grid points beyond shock position
-    shock_position = argmax(avrg_qx) + 1
-    downstream_fit = savitzky_golay(
-        avrg_qx[0:shock_position], 41, 1
-    )
-    upstream_fit = average(qx[shock_position+1:, :, :])
-
-    for i in range(0, shock_position):
-        avrg_qx[i] = downstream_fit[i]
-    for i in range(shock_position, nx[0]):
-        avrg_qx[i] = upstream_fit
-
-    y_max = 1.2*max(avrg_qx)
-    plot(x1, avrg_qx, 'k', x1, original_profile, 'r')
-    xlabel(r'x')
-    ylabel(r'Fitted (black), Original (red)')
-    title('Average ' + fluid_quantity)
-    axis([0, 1, -0.5, y_max])
-    savefig(fluid_quantity+'_x_average')
-    show()
-
-    return avrg_qx
 
 
 # Select random point
@@ -144,10 +141,10 @@ def calculate_difference_squared(dimensions, indices, d_index, del_qx):
 # Calculate the correlation function as a function of grid separation
 def calculate_structure_function(
     num_sample_points,
-    nx,
-    dimensions,
     max_step_size,
-    del_qx
+    nx,
+    del_qx,
+    dimensions
 ):
     structure_function = []
     for step_size in range(1, max_step_size + 1):
@@ -182,89 +179,59 @@ def plot_structure_function(
     show()
 
 
-def density_turbulence_spectrum(D, num_sample_points):
-    dimensions, nx, dx, max_step_size = grid_info(D)
-
-    # Average values
-    avrg_rho = average_fluid_field(
-        D.x1,
-        D.rho,
-        nx,
-        'Density'
-    )
-
-    # Turbulent variations
-    del_rho = array(list(D.rho))
-    for i in range(0, nx[0]):
-        del_rho[i, :, :] = array(D.rho[i, :, :] - avrg_rho[i])
-
-    del_rho = [del_rho]
-
-    structure_function_rho = calculate_structure_function(
-        num_sample_points,
-        nx,
-        dimensions,
-        max_step_size,
-        del_rho
-    )
-
-    plot_structure_function(
-      structure_function_rho,
-      max_step_size,
-      graph_title=r'Density'
-    )
-
-
-def velocity_turbulence_spectrum(D, num_sample_points):
-    dimensions, nx, dx, max_step_size = grid_info(D)
-
-    # Average values
-    avrg_vx1 = average_fluid_field(
-        D.x1,
-        D.vx1,
-        nx,
-        '$V_{x_1}$'
-    )
-    avrg_vx2 = average(D.vx2)
-    avrg_vx3 = average(D.vx3)
-
-    # Turbulent variations
-    del_vx1 = array(list(D.vx1))
-    for i in range(0, nx[0]):
-        del_vx1[i, :, :] = array(D.vx1[i, :, :] - avrg_vx1[i])
-    del_vx2 = array(D.vx2)-avrg_vx2
-    del_vx3 = array(D.vx3)-avrg_vx3
-
-    del_vx = [
-        del_vx1,
-        del_vx2,
-        del_vx3
-    ]
-
-    structure_function_vx = calculate_structure_function(
-        num_sample_points,
-        nx,
-        dimensions,
-        max_step_size,
-        del_vx
-    )
-
-    plot_structure_function(
-      structure_function_vx,
-      max_step_size,
-      graph_title=r'Velocity'
-    )
-
-
 if __name__ == '__main__':
-    import os
-    import pyPLUTO as pp
-
-    plutodir = os.environ['PLUTO_DIR']
     wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_8/output/'
+    file_time = 7
+    shock_present = 1
+    shock_direction = 'x1'
+    region = 'upstream'
+    plot_averages = 0
 
-    D = pp.pload(7, w_dir=wdir)
+    if shock_present:
+        shock_index = locate_shock(D)
+    else:
+        shock_index = 0
+        region = 'no_shock'
+
+    D = pp.pload(file_time, w_dir=wdir)
     num_sample_points = 10000
 
-    density_turbulence_spectrum(D, num_sample_points)
-    velocity_turbulence_spectrum(D, num_sample_points)
+    dimensions, nx, max_step_size = grid_info(
+        D,
+        shock_index,
+        shock_direction,
+        region
+    )
+
+    fluid_quantities = [r'density', r'velocity', r'magnetic field']
+    fluid_quantities = [r'velocity']
+    for fluid_quantity in fluid_quantities:
+        del_qx = remove_average_fluid_component(
+            D,
+            fluid_quantity,
+            shock_index,
+            shock_direction,
+            wdir,
+            plot_averages
+        )
+
+        if shock_present:
+            del_qx = limit_quantity_to_region(
+                del_qx,
+                region,
+                nx
+            )
+
+        structure_function_qx = calculate_structure_function(
+            num_sample_points,
+            max_step_size,
+            nx,
+            del_qx,
+            dimensions
+        )
+
+        plot_structure_function(
+          structure_function_qx,
+          max_step_size,
+          graph_title=fluid_quantity.title()
+        )
