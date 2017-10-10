@@ -1,17 +1,18 @@
-# Simulations consist of a rectangular grid, with x-axis along the long-axis
-# of rectangular region.  A planar shock propagates along x-axis
-#
-# Calculate the average profile of a fluid quantity along the x-axis, i.e.,
-# the fluid quantity is averaged along the y- and z-axes.  In general the
-# averaged profile will not be smooth.  Therefore, it is necessary to fit a
-# smooth function to the profile.  However, the presence of a shock complicates
-# the problem.
+# Calculate the average profiles of fluid quantities along the propagation axis
+# of the planar shock.  The fluid quantities are averaged in the plane perpen-
+# dicular to the propagation direction.  In general the averaged profile will
+# not be smooth.  Therefore, it is necessary to fit a smooth function to the
+# profile.  However, the presence of a shock complicates the problem.
 #
 # The approach is to fit the shocked region with a smooth curve.  Upstream of
 # the shock the fluid quantity is again averaged, but this time over all axes.
 # The second averaging should ensure a smooth profile upstream of the shock.
 
+# Author: Michael Vorster
+# Last updated: 10 October 2017
 
+
+import os
 import pyPLUTO as pp
 from fitcurve import savitzky_golay
 from numpy import (
@@ -44,6 +45,7 @@ def locate_shock(D, shock_direction):
         square(D.bx2) +
         square(D.bx3)
     )
+
     pressure = D.prs
     # variables = [
     #     density,
@@ -67,7 +69,7 @@ def locate_shock(D, shock_direction):
                 avrg_qx[index] = average(variable[index, :, :])
             elif shock_direction == 'x2':
                 avrg_qx[index] = average(variable[:, index, :])
-            else:    
+            else:
                 avrg_qx[index] = average(variable[:, :, index])
         avrg_variables.append(avrg_qx)
 
@@ -81,10 +83,10 @@ def locate_shock(D, shock_direction):
         ratio = []
         while dn < dn_max:
             set_1 = avrg_variable[
-                initial_estimate - n + dn : initial_estimate + dn + 1  # noqa
+                initial_estimate - n + dn: initial_estimate + dn + 1
             ]
             set_2 = avrg_variable[
-                initial_estimate + dn + 1 : initial_estimate + n + dn  # noqa
+                initial_estimate + dn + 1: initial_estimate + n + dn
             ]
             ratio.append(average(set_1)/average(set_2))
             dn += 1
@@ -95,66 +97,129 @@ def locate_shock(D, shock_direction):
     return avrg_shock_index
 
 
-def grid_variables(D):
-    nx = (len(D.x1), len(D.x2), len(D.x3))
-    dx = [
-        (max(D.x1) - min(D.x1))/(nx[0] - 1.),
-        (max(D.x2) - min(D.x2))/(nx[1] - 1.),
-        (max(D.x3) - min(D.x3))/(nx[2] - 1.)
-    ]
+def plot_average_fluid_field(
+    D,
+    x_grid,
+    qx,
+    avrg_qx,
+    avrg_fitted,
+    fluid_quantity,
+    shock_direction,
+    wdir
+):
+    graph_dir = wdir + 'fit_to_components_averaged/'
+    if not os.path.exists(graph_dir):
+        os.makedirs(graph_dir)
 
-    return nx, dx
+    if shock_direction == 'x1':
+        qx_slice = qx[:, len(D.x2)/2, len(D.x3)/2]
+    elif shock_direction == 'x2':
+        qx_slice = qx[len(D.x1)/2, :, len(D.x3)/2]
+    else:
+        qx_slice = qx[len(D.x1)/2, len(D.x2)/2, :]
 
+    y_min = 1.2*min(qx_slice)
+    y_max = 1.2*max(qx_slice)
+    file_name = fluid_quantity[:]
+    for char in ['$', '{', '}']:
+        file_name = file_name.replace(char, '')
 
-def plot_average_fluid_field(x1, qx, avrg_qx, avrg_fitted, fluid_quantity):
-    y_max = 1.2*max(avrg_qx)
-    plot(x1, qx[:, 80, 80], 'b', x1, avrg_qx, 'r', x1, avrg_fitted, 'k')
-    xlabel(r'x')
+    plot(x_grid, qx_slice, 'b', x_grid, avrg_qx, 'r', x_grid, avrg_fitted, 'k')
+    xlabel(shock_direction)
     ylabel(r'Simulation [blue], Average [red], Fitted [black]')
     title('Average ' + fluid_quantity)
-    axis([0, 1, -0.5, y_max])
-    savefig(fluid_quantity+'_x_average')
+    axis([0, 1, y_min, y_max])
+    savefig(graph_dir + file_name + '_average')
     show()
 
 
-def average_fluid_field(x1, qx, nx, fluid_quantity, shock_index):
-    avrg_qx = [0]*nx[0]
-    for i in range(0, nx[0]):
-        avrg_qx[i] = average(qx[i, :, :])
+def average_fluid_field(
+    D,
+    x_grid,
+    qx,
+    nx,
+    fluid_quantity,
+    shock_index,
+    shock_direction,
+    wdir
+):
+    avrg_qx = [0]*nx
+    for index in range(0, nx):
+        if shock_direction == 'x1':
+            avrg_qx[index] = average(qx[index, :, :])
+        elif shock_direction == 'x2':
+            avrg_qx[index] = average(qx[:, index, :])
+        else:
+            avrg_qx[index] = average(qx[:, :, index])
 
     avrg_fitted = list(avrg_qx)
 
     downstream_fit = savitzky_golay(
         avrg_fitted[0:shock_index], 41, 1
     )
-    upstream_fit = average(qx[shock_index+1:, :, :])
+    if shock_direction == 'x1':
+        upstream_fit = average(qx[shock_index+1:, :, :])
+    elif shock_direction == 'x2':
+        upstream_fit = average(qx[:, shock_index+1:, :])
+    else:
+        upstream_fit = average(qx[:, :, shock_index+1:])
 
-    for i in range(0, shock_index):
-        avrg_fitted[i] = downstream_fit[i]
-    for i in range(shock_index, nx[0]):
-        avrg_fitted[i] = upstream_fit
+    for index in range(0, shock_index):
+        avrg_fitted[index] = downstream_fit[index]
+    for index in range(shock_index, nx):
+        avrg_fitted[index] = upstream_fit
 
-    plot_average_fluid_field(x1, qx, avrg_qx, avrg_fitted, fluid_quantity)
+    plot_average_fluid_field(
+        D,
+        x_grid,
+        qx,
+        avrg_qx,
+        avrg_fitted,
+        fluid_quantity,
+        shock_direction,
+        wdir
+    )
 
     return avrg_fitted
 
 
-def remove_average_fluid_component(D, fluid_quantity, shock_index):
-    nx, dx = grid_variables(D)
+def remove_average_fluid_component(
+    D,
+    fluid_quantity,
+    shock_index,
+    shock_direction,
+    wdir
+):
+    nx = len(getattr(D, shock_direction))
     del_qx = []
+
+    if shock_direction == 'x1':
+        perp_components = ['x2', 'x3']
+    elif shock_direction == 'x2':
+        perp_components = ['x1', 'x3']
+    else:
+        perp_components = ['x1', 'x2']
 
     if flow_quantity == 'density':
         qx = [D.rho]
         qx_title = ['density']
     elif flow_quantity == 'velocity':
-        qx = [D.vx1]
-        qx_title = ['$V_x$']
-        del_qx.append(array(D.vx2) - average(D.vx2))
-        del_qx.append(array(D.vx3) - average(D.vx3))
+        qx = [getattr(D, 'v' + shock_direction)]
+        qx_title = ['$V_{' + shock_direction + '}$']
+        for perp_component in perp_components:
+            vx = getattr(D, 'v' + perp_component)
+            del_qx.append(array(vx) - average(vx))
     elif flow_quantity == 'magnetic field':
-        qx = [D.bx2, D.bx3]
-        qx_title = ['$B_y$', '$B_z$']
-        del_qx.append(array(D.bx1) - average(D.bx1))
+        qx = [
+            getattr(D, 'b' + perp_components[0]),
+            getattr(D, 'b' + perp_components[1])
+        ]
+        qx_title = [
+            '$B_{' + perp_components[0] + '}$',
+            '$B_{' + perp_components[1] + '}$'
+        ]
+        bx_para = getattr(D, 'b' + shock_direction)
+        del_qx.append(array(bx_para) - average(bx_para))
     else:
         print('Fluid quantity not recognised')
         exit(0)
@@ -162,36 +227,63 @@ def remove_average_fluid_component(D, fluid_quantity, shock_index):
     number_of_components = len(qx)
     for component in range(0, number_of_components):
         avrg_qx = average_fluid_field(
-            D.x1,
+            D,
+            getattr(D, shock_direction),
             qx[component],
             nx,
             qx_title[component],
-            shock_index
+            shock_index,
+            shock_direction,
+            wdir
         )
 
         del_component = array(list(qx[component]))
-        for i in range(0, nx[0]):
-            del_component[i, :, :] = array(qx[component][i, :, :] - avrg_qx[i])
+        for index in range(0, nx):
+            if shock_direction == 'x1':
+                del_component[index, :, :] = array(
+                    qx[component][index, :, :] - avrg_qx[index]
+                )
+            elif shock_direction == 'x2':
+                del_component[:, index, :] = array(
+                    qx[component][:, index, :] - avrg_qx[index]
+                )
+            else:
+                del_component[:, :, index] = array(
+                    qx[component][:, :, index] - avrg_qx[index]
+                )
         del_qx.append(del_component)
 
     if flow_quantity == 'velocity':
-        del_qx[0], del_qx[1], del_qx[2] = del_qx[2], del_qx[0], del_qx[1]
+        if shock_direction == 'x1':
+            del_qx[0], del_qx[1], del_qx[2] = del_qx[2], del_qx[0], del_qx[1]
+        if shock_direction == 'x2':
+            del_qx[1], del_qx[2] = del_qx[2], del_qx[1]
 
     return del_qx
 
 
 if __name__ == '__main__':
-    wdir = '/home/mvorster/PLUTO/B_Shock_turbulence/bx0.8_cs1.35/output/'
-    file_time = 4
-    D = pp.pload(file_time, w_dir=wdir)
+    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
+    file_time = 7
+    shock_direction = 'x1'
+    shock_index = 535
+    # wdir = '/home/mvorster/PLUTO/B_Shock_turbulence/bx0.8_cs1.35/'
+    # file_time = 4
+    # shock_direction = 'x2'
+    # shock_index = 260
 
-    # flow_quantity: options are
-    #                'density'
-    #                'velocity'
-    #                'magnetic field'
-    flow_quantity = 'magnetic field'
+    if not wdir[-1] == '/':
+        wdir = wdir + '/'
+    D = pp.pload(file_time, w_dir=wdir + 'output/')
+    flow_quantities = ['density', 'velocity', 'magnetic field']
 
-    shock_index = locate_shock(D, 'x2')
-    print(shock_index)
-    # shock_index = 502
-    # remove_average_fluid_component(D, flow_quantity, shock_index)
+    # shock_index = locate_shock(D, shock_direction)
+    # print(shock_index)
+    for flow_quantity in flow_quantities:
+        remove_average_fluid_component(
+            D,
+            flow_quantity,
+            shock_index,
+            shock_direction,
+            wdir
+        )
