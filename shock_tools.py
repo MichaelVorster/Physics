@@ -32,7 +32,7 @@ from matplotlib.pyplot import (
 )
 
 
-def locate_shock(D):
+def locate_shock(D, shock_direction):
     density = D.rho
     velocity = sqrt(
         square(D.vx1) +
@@ -45,25 +45,30 @@ def locate_shock(D):
         square(D.bx3)
     )
     pressure = D.prs
-    variables = [
-        density,
-        velocity,
-        magnetic_field
-    ]
+    # variables = [
+    #     density,
+    #     velocity,
+    #     magnetic_field
+    # ]
 
     # using just pressure for bx0.8_cs1.35 seems sufficient
     variables = [
         pressure
     ]
 
-    nx = len(D.x2)
+    nx = len(getattr(D, shock_direction))
 
-    # average over y and z directions
+    # average over plane perpendicular to shock direction
     avrg_variables = []
     for variable in variables:
         avrg_qx = [0]*nx
-        for j in range(0, nx):
-            avrg_qx[j] = average(variable[:, j, :])
+        for index in range(0, nx):
+            if shock_direction == 'x1':
+                avrg_qx[index] = average(variable[index, :, :])
+            elif shock_direction == 'x2':
+                avrg_qx[index] = average(variable[:, index, :])
+            else:    
+                avrg_qx[index] = average(variable[:, :, index])
         avrg_variables.append(avrg_qx)
 
     avrg_shock_index_variables = []
@@ -176,8 +181,8 @@ def remove_average_fluid_component(D, fluid_quantity, shock_index):
 
 
 if __name__ == '__main__':
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/output/'
-    file_time = 7
+    wdir = '/home/mvorster/PLUTO/B_Shock_turbulence/bx0.8_cs1.35/output/'
+    file_time = 4
     D = pp.pload(file_time, w_dir=wdir)
 
     # flow_quantity: options are
@@ -186,7 +191,7 @@ if __name__ == '__main__':
     #                'magnetic field'
     flow_quantity = 'magnetic field'
 
-    shock_index = locate_shock(D)
+    shock_index = locate_shock(D, 'x2')
     print(shock_index)
     # shock_index = 502
     # remove_average_fluid_component(D, flow_quantity, shock_index)
