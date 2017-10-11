@@ -203,16 +203,16 @@ def remove_average_fluid_component(
     else:
         perp_components = ['x1', 'x2']
 
-    if flow_quantity == 'density':
+    if fluid_quantity == 'density':
         qx = [D.rho]
         qx_title = ['density']
-    elif flow_quantity == 'velocity':
+    elif fluid_quantity == 'velocity':
         qx = [getattr(D, 'v' + shock_direction)]
         qx_title = ['$V_{' + shock_direction + '}$']
         for perp_component in perp_components:
             vx = getattr(D, 'v' + perp_component)
             del_qx.append(array(vx) - average(vx))
-    elif flow_quantity == 'magnetic field':
+    elif fluid_quantity == 'magnetic field':
         qx = [
             getattr(D, 'b' + perp_components[0]),
             getattr(D, 'b' + perp_components[1])
@@ -257,7 +257,7 @@ def remove_average_fluid_component(
                 )
         del_qx.append(del_component)
 
-    if flow_quantity == 'velocity':
+    if fluid_quantity == 'velocity':
         if shock_direction == 'x1':
             del_qx[0], del_qx[1], del_qx[2] = del_qx[2], del_qx[0], del_qx[1]
         if shock_direction == 'x2':
@@ -281,14 +281,14 @@ if __name__ == '__main__':
     if not wdir[-1] == '/':
         wdir = wdir + '/'
     D = pp.pload(file_time, w_dir=wdir + 'output/')
-    flow_quantities = ['density', 'velocity', 'magnetic field']
+    fluid_quantities = ['density', 'velocity', 'magnetic field']
 
     # shock_index = locate_shock(D, shock_direction)
     # print(shock_index)
-    for flow_quantity in flow_quantities:
+    for fluid_quantity in fluid_quantities:
         remove_average_fluid_component(
             D,
-            flow_quantity,
+            fluid_quantity,
             shock_index,
             shock_direction,
             wdir,
