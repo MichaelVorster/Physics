@@ -236,17 +236,17 @@ if __name__ == '__main__':
     # shock_direction = 'x1'
 
     wdir = '/home/mvorster/PLUTO/B_Shock_turbulence/bx0.8_cs1.35/'
-    file_time = 0
+    file_time = 4
     shock_present = 1
     shock_direction = 'x2'
 
-    region = 'upstream'
+    region = 'downstream'
     plot_averages = 0
     num_sample_points = 10000
 
     if not wdir[-1] == '/':
         wdir = wdir + '/'
-    D = pp.pload(file_time, w_dir=wdir + 'output/')
+    D = pp.pload(file_time, w_dir=wdir+'output/')
 
     if shock_present:
         if file_time == 0:
@@ -266,14 +266,20 @@ if __name__ == '__main__':
 
     fluid_quantities = [r'velocity', r'magnetic field']
     for fluid_quantity in fluid_quantities:
-        del_qx = remove_average_fluid_component(
-            D,
-            fluid_quantity,
-            shock_index,
-            shock_direction,
-            wdir,
-            plot_averages
-        )
+        # del_qx = remove_average_fluid_component(
+        #     D,
+        #     fluid_quantity,
+        #     shock_index,
+        #     shock_direction,
+        #     wdir,
+        #     plot_averages
+        # )
+
+        if fluid_quantity == 'velocity':
+            del_qx = [D.vx1, D.vx2, D.vx3]
+        if fluid_quantity == 'magnetic field':
+            del_qx = [D.bx1, D.bx2, D.bx3]
+
 
         if shock_present:
             del_qx = limit_quantity_to_region(
