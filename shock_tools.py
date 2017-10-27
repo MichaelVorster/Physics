@@ -19,8 +19,10 @@ from numpy import (
     argmax,
     array,
     average,
+    int_,
     square,
-    sqrt
+    sqrt,
+    zeros
 )
 from matplotlib.pyplot import (
     axis,
@@ -33,7 +35,7 @@ from matplotlib.pyplot import (
 )
 
 
-def locate_shock(D, shock_direction):
+def create_scalar_fields(D):
     density = D.rho
     velocity = sqrt(
         square(D.vx1) +
@@ -47,17 +49,47 @@ def locate_shock(D, shock_direction):
     )
 
     pressure = D.prs
-    # variables = [
+    # scalar_fields = [
     #     density,
     #     velocity,
     #     magnetic_field
     # ]
 
     # using just pressure for bx0.8_cs1.35 seems sufficient
-    variables = [
+    scalar_fields = [
         pressure
     ]
 
+    return scalar_fields
+
+
+def locate_max_jump(variables):
+    avrg_index_variables = []
+    for variable in variables:
+        n = 10
+        dn = 0
+        dn_max = 100
+        initial_estimate = argmax(variable)
+        ratio = []
+        while dn < dn_max:
+            set_1 = variable[
+                initial_estimate - n + dn: initial_estimate + dn + 1
+            ]
+            set_2 = variable[
+                initial_estimate + dn + 1: initial_estimate + n + dn
+            ]
+            ratio.append(average(set_1)/average(set_2))
+            dn += 1
+        avrg_index_variables.append(
+            initial_estimate + argmax(ratio)
+        )
+    avrg_index = int(average(avrg_index_variables))
+
+    return avrg_index
+
+
+def locate_shock(D, shock_direction):
+    variables = create_scalar_fields(D)
     nx = len(getattr(D, shock_direction))
 
     # average over plane perpendicular to shock direction
@@ -73,28 +105,38 @@ def locate_shock(D, shock_direction):
                 avrg_qx[index] = average(variable[:, :, index])
         avrg_variables.append(avrg_qx)
 
-    avrg_shock_index_variables = []
-    for avrg_variable in avrg_variables:
-        shock_index = []
-        n = 10
-        dn = 0
-        dn_max = 50
-        initial_estimate = argmax(avrg_variable)
-        ratio = []
-        while dn < dn_max:
-            set_1 = avrg_variable[
-                initial_estimate - n + dn: initial_estimate + dn + 1
-            ]
-            set_2 = avrg_variable[
-                initial_estimate + dn + 1: initial_estimate + n + dn
-            ]
-            ratio.append(average(set_1)/average(set_2))
-            dn += 1
-        shock_index.append(initial_estimate + argmax(ratio))
-        avrg_shock_index_variables.append(int(average(shock_index)) + 1)
-    avrg_shock_index = int(average(avrg_shock_index_variables)) + 1
+    shock_index = locate_max_jump(avrg_variables)
 
-    return avrg_shock_index
+    return shock_index
+
+
+def locate_shock_plane(D, shock_direction):
+    variables = create_scalar_fields(D)
+
+    if shock_direction == 'x1':
+        nx = [D.n2, D.n3]
+    elif shock_direction == 'x2':
+        nx = [D.n1, D.n3]
+    else:
+        nx = [D.n1, D.n2]
+
+    shock_index_plane = zeros((nx[0], nx[1]), dtype=int_)
+
+    for n0 in range(0, nx[0]):
+        for n1 in range(0, nx[1]):
+            variables_slices = []
+            for variable in variables:
+                if shock_direction == 'x1':
+                    single_variable_slice = variable[:, n0, n1]
+                elif shock_direction == 'x2':
+                    single_variable_slice = variable[n0, :, n1]
+                else:
+                    single_variable_slice = variable[n0, n1, :]
+                variables_slices.append(single_variable_slice)
+
+            shock_index_plane[n0, n1] = locate_max_jump(variables_slices)
+
+    return shock_index_plane
 
 
 def plot_average_fluid_field(
@@ -267,14 +309,14 @@ def remove_average_fluid_component(
 
 
 if __name__ == '__main__':
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
-    file_time = 7
-    shock_direction = 'x1'
-    shock_index = 535
-    # wdir = '/home/mvorster/PLUTO/B_Shock_turbulence/bx0.8_cs1.35/'
-    # file_time = 4
-    # shock_direction = 'x2'
-    # shock_index = 260
+    # wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
+    # file_time = 7
+    # shock_direction = 'x1'
+    # shock_index = 535
+    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO/'
+    file_time = 4
+    shock_direction = 'x2'
+    shock_index = 260
 
     plot_averages = 1
 
@@ -283,14 +325,14 @@ if __name__ == '__main__':
     D = pp.pload(file_time, w_dir=wdir + 'output/')
     fluid_quantities = ['density', 'velocity', 'magnetic field']
 
-    # shock_index = locate_shock(D, shock_direction)
+    shock_index = locate_shock_plane(D, shock_direction)
     # print(shock_index)
-    for fluid_quantity in fluid_quantities:
-        remove_average_fluid_component(
-            D,
-            fluid_quantity,
-            shock_index,
-            shock_direction,
-            wdir,
-            plot_averages
-        )
+    # for fluid_quantity in fluid_quantities:
+    #     remove_average_fluid_component(
+    #         D,
+    #         fluid_quantity,
+    #         shock_index,
+    #         shock_direction,
+    #         wdir,
+    #         plot_averages
+    #     )
