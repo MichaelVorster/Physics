@@ -20,8 +20,10 @@ from numpy import (
     array,
     average,
     int_,
+    savetxt,
     square,
     sqrt,
+    transpose,
     zeros
 )
 from matplotlib.pyplot import (
@@ -110,7 +112,7 @@ def locate_shock(D, shock_direction):
     return shock_index
 
 
-def locate_shock_plane(D, shock_direction):
+def locate_shock_plane(D, shock_direction, wdir):
     variables = create_scalar_fields(D)
 
     if shock_direction == 'x1':
@@ -135,6 +137,11 @@ def locate_shock_plane(D, shock_direction):
                 variables_slices.append(single_variable_slice)
 
             shock_index_plane[n0, n1] = locate_max_jump(variables_slices)
+
+    # Fortran is column-major order, and Python is row-major order.
+    # Array must therefore be transposed for Fortran purposes.
+    shock_index_plane_transposed = transpose(shock_index_plane)
+    savetxt('shock_plane.txt', shock_index_plane_transposed)
 
     return shock_index_plane
 
@@ -309,14 +316,14 @@ def remove_average_fluid_component(
 
 
 if __name__ == '__main__':
-    # wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
-    # file_time = 7
-    # shock_direction = 'x1'
-    # shock_index = 535
-    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO/'
-    file_time = 4
-    shock_direction = 'x2'
-    shock_index = 260
+    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
+    file_time = 7
+    shock_direction = 'x1'
+    shock_index = 535
+    # wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO/'
+    # file_time = 4
+    # shock_direction = 'x2'
+    # shock_index = 260
 
     plot_averages = 1
 
@@ -325,7 +332,7 @@ if __name__ == '__main__':
     D = pp.pload(file_time, w_dir=wdir + 'output/')
     fluid_quantities = ['density', 'velocity', 'magnetic field']
 
-    shock_index = locate_shock_plane(D, shock_direction)
+    shock_index = locate_shock_plane(D, shock_direction, wdir)
     # print(shock_index)
     # for fluid_quantity in fluid_quantities:
     #     remove_average_fluid_component(
