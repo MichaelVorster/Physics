@@ -9,7 +9,7 @@
 # The second averaging should ensure a smooth profile upstream of the shock.
 
 # Author: Michael Vorster
-# Last updated: 10 October 2017
+# Last updated: 30 October 2017
 
 
 import os
@@ -112,7 +112,7 @@ def locate_shock(D, shock_direction):
     return shock_index
 
 
-def locate_shock_plane(D, shock_direction, wdir):
+def locate_shock_plane(D, shock_direction, wdir, file_time):
     variables = create_scalar_fields(D)
 
     if shock_direction == 'x1':
@@ -140,8 +140,10 @@ def locate_shock_plane(D, shock_direction, wdir):
 
     # Fortran is column-major order, and Python is row-major order.
     # Array must therefore be transposed for Fortran purposes.
-    shock_index_plane_transposed = transpose(shock_index_plane)
-    savetxt('shock_plane.txt', shock_index_plane_transposed)
+    # Should also add '1' to shock position since Fortran arrays start at 1
+    shock_index_plane_transposed = transpose(shock_index_plane+1)
+    output_file_name = wdir + 'shock_plane_' + str(file_time) + '.txt'
+    savetxt(output_file_name, shock_index_plane_transposed)
 
     return shock_index_plane
 
@@ -316,14 +318,14 @@ def remove_average_fluid_component(
 
 
 if __name__ == '__main__':
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
-    file_time = 7
-    shock_direction = 'x1'
-    shock_index = 535
-    # wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO/'
-    # file_time = 4
-    # shock_direction = 'x2'
-    # shock_index = 260
+    # wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
+    # file_time = 7
+    # shock_direction = 'x1'
+    # shock_index = 535
+    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO/'
+    file_time = 4
+    shock_direction = 'x2'
+    shock_index = 260
 
     plot_averages = 1
 
@@ -332,7 +334,7 @@ if __name__ == '__main__':
     D = pp.pload(file_time, w_dir=wdir + 'output/')
     fluid_quantities = ['density', 'velocity', 'magnetic field']
 
-    shock_index = locate_shock_plane(D, shock_direction, wdir)
+    shock_index = locate_shock_plane(D, shock_direction, wdir, file_time)
     # print(shock_index)
     # for fluid_quantity in fluid_quantities:
     #     remove_average_fluid_component(

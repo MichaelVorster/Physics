@@ -36,7 +36,8 @@ only contain the data of a single variable
 - Calculates a fit to a curve using the Savitzky-Golan method
 
 ### `shock_tools.py`
-- Contains a function to locate the position of the shock    
+- Contains the function `locate_shock` to locate the average position of the shock    
+- Contains the function `locate_shock_plane` to locate the 2D shock plane    
 - Contains a function to calculate the turbulent variations (_delta_var_)    
   * the average fluid quantities are calculated along the propagation direction of the shock    
   * the average quantities are subtracted from the fluid fields to get the variations    
