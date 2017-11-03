@@ -318,14 +318,14 @@ def remove_average_fluid_component(
 
 
 if __name__ == '__main__':
-    # wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
-    # file_time = 7
-    # shock_direction = 'x1'
-    # shock_index = 535
-    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO/'
-    file_time = 4
-    shock_direction = 'x2'
-    shock_index = 260
+    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b/'
+    file_time = 7
+    shock_direction = 'x1'
+    shock_index = 535
+    # wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO/'
+    # file_time = 4
+    # shock_direction = 'x2'
+    # shock_index = 260
 
     plot_averages = 1
 
