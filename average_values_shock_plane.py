@@ -24,7 +24,7 @@ def average_B_shock_plane(data_file_name, shock_direction, D):
 
         for i in range(0, len(data)):
             index = data[i] - 1.
-            shift = 4
+            shift = 2
             if shock_direction == 'x':
                 x = int(index)
                 y = y_count
