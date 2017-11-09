@@ -4,7 +4,8 @@ import pyPLUTO as pp
 
 def average_B_shock_plane(data_file_name, shock_direction, D):
     average_index = 0.
-    average_B = 0
+    average_B = 0.
+    average_compression = 0.
     x_count = 0
     y_count = 0
     z_count = 0
@@ -23,20 +24,25 @@ def average_B_shock_plane(data_file_name, shock_direction, D):
 
         for i in range(0, len(data)):
             index = data[i] - 1.
+            shift = 2
             if shock_direction == 'x':
                 x = int(index)
                 y = y_count
                 z = z_count
+                compression = D.rho[x-shift, y, z]/D.rho[x+shift, y, z]
             elif shock_direction == 'y':
                 x = x_count
                 y = int(index)
                 z = z_count
+                compression = D.rho[x, y-shift, z]/D.rho[x, y+shift, z]
             else:
                 x = x_count
                 y = y_count
                 z = int(index)
+                compression = D.rho[x, y, z-shift]/D.rho[x, y, z+shift]
             average_index = average_index + index    
             average_B = average_B + B[x, y, z]
+            average_compression = average_compression + compression
             total_count += 1
 
             if shock_direction == 'x': y_count += 1
@@ -46,16 +52,17 @@ def average_B_shock_plane(data_file_name, shock_direction, D):
         if shock_direction == 'z': y_count += 1
 
     print('Average index of shock:', average_index/total_count)    
-    print('Average B along shock plane:', average_B/total_count)    
+    print('Average B along shock plane:', average_B/total_count)
+    print('Average shock compression: ', average_compression/total_count)  
 
     input_file.close()
 
 
 if __name__ == '__main__':
 
-    wdir = '/home/mvorster/PLUTO/Shock_turbulence/Results/Run_15_b'
-    file_time = 7
-    shock_direction = 'x'
+    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO'
+    file_time = 4
+    shock_direction = 'y'
 
     if not wdir[-1] == '/':
         wdir = wdir + '/'
