@@ -60,9 +60,9 @@ def average_B_shock_plane(data_file_name, shock_direction, D):
 
 if __name__ == '__main__':
 
-    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/Run_1/PLUTO'
+    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/parallel_shock/Run_1/PLUTO/'
     file_time = 4
-    shock_direction = 'y'
+    shock_direction = 'x'
 
     if not wdir[-1] == '/':
         wdir = wdir + '/'
