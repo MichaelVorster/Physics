@@ -137,7 +137,6 @@ def locate_shock_plane(D, shock_direction, wdir, file_time):
                 variables_slices.append(single_variable_slice)
 
             shock_index_plane[n0, n1] = locate_max_jump(variables_slices)
-            print(n0, n1, shock_index_plane[n0, n1])
 
     # Fortran is column-major order, and Python is row-major order.
     # Array must therefore be transposed for Fortran purposes.
@@ -323,9 +322,9 @@ if __name__ == '__main__':
     # file_time = 7
     # shock_direction = 'x1'
     # shock_index = 535
-    wdir = '/home/mvorster/512_cube/bx1.6_cs0.8/perpendicular_shock/Run_1/PLUTO/'
+    wdir = '/home/cronus/vorster/PLUTO/512_Shock_turbulence/bx1.6_cs0.8/parallel_shock'
     file_time = 4
-    shock_direction = 'x2'
+    shock_direction = 'x1'
     # shock_index = 260
 
     plot_averages = 0
