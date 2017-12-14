@@ -5,13 +5,7 @@
 #
 # AUTHOR: Michael Vorster
 #
-# LAST UPDATED: 09 October 2017
-
-
-# If shock is along x-axis, the following changes are needed 
-# (might be incomplete):
-# Line 127 and 132
-# In 'get_grid_info', especially the array slices
+# LAST UPDATED: 14 December 2017
 
 
 from math import (
@@ -83,7 +77,8 @@ def calculate_next_position(
     step_length,
     grid_min,
     grid_max,
-    shock_index
+    shock_index,
+    shock_direction
 ):
     out_of_domain = 0
     B_dot_product = 0
@@ -97,9 +92,17 @@ def calculate_next_position(
         step = B_field[dimension][0]*step_length/B_magnitude
         next_position[dimension] = starting_position[dimension] + step
 
-    # periodic boundaries in x and z, and in y when no shock is present
-    if shock_index > 0:
-        if next_position[1] < grid_min[1] or next_position[1] > grid_max[1]:
+    # periodic boundaries, except in shock propagation direction
+    
+    if dimensions == 3:
+        if shock_index > 0:
+            if shock_direction == 'x1':
+                i = 0
+            if shock_direction == 'x2':
+                i = 1
+            if shock_direction == 'x3':
+                i = 2
+        if next_position[i] < grid_min[i] or next_position[i] > grid_max[i]:
             out_of_domain = 1
 
     return next_position, out_of_domain
@@ -123,13 +126,20 @@ def interpolate_magnetic_field(
     B_field = [0.]*dimensions
     position_temp = [0.]*dimensions
 
-    # periodic boundaries along x and z (and y if no shock is present)
-    dimensions_range = [0, 2]
+    # periodic boundaries, except in shock propagation direction
+    if shock_direction == 'x1':
+        dimensions_range = [1, 2]
+        position_temp[0] = position[0]
+    if shock_direction == 'x2':
+        dimensions_range = [0, 2]
+        position_temp[1] = position[1]
+    if shock_direction == 'x3':
+        dimensions_range = [0, 1]
+        position_temp[2] = position[2]
+
     if shock_index == 0 or dimensions == 2:
         dimensions_range = range(0, dimensions)
 
-    # periodic boundaries along y and z (and x if no shock is present)
-    position_temp[1] = position[1]
     for dimension in dimensions_range:
         max_grid = max(grid[dimension])
         min_grid = min(grid[dimension])
@@ -170,7 +180,7 @@ def remove_additional_point(
         field_line_components[0][dimension].pop()
 
 
-def get_grid_info(dimensions, D, flow_position, shock_index):
+def get_grid_info(dimensions, D, flow_position, shock_index, shock_direction):
     if shock_index == 0:
         offset = 0
 
@@ -178,38 +188,63 @@ def get_grid_info(dimensions, D, flow_position, shock_index):
     # plotting plane to have the same dimensions.
     if dimensions == 2:
         offset = 10
+        len_coord = len(getattr(D, shock_direction))
         if flow_position == 'upstream':
-            if len(D.x2)/2 > shock_index:
-                y_slice = len(D.x2)/2
+            if len_coord/2 > shock_index + offset:
+                grid_slice = len_coord/2
             else:
                 # don't take slice at shock position
-                y_slice = shock_index + offset
+                grid_slice = shock_index + offset
         if flow_position == 'downstream':
-            if len(D.x2)/2 < shock_index:
-                y_slice = len(D.x2)/2
+            if len_coord/2 < shock_index - offset:
+                grid_slice = len_coord/2
             else:
                 # don't take slice at shock position
-                y_slice = shock_index - offset
-        grid = [D.x1, D.x3]
-        B_component_array = [D.bx1[:, y_slice, :], D.bx3[:, y_slice, :]]
+                grid_slice = shock_index - offset
+        if shock_direction == 'x1':
+            grid = [D.x2, D.x3]
+            B_component_array = [
+                D.bx2[grid_slice, :, :],
+                D.bx3[grid_slice, :, :]
+            ]
+        elif shock_direction == 'x2':
+            grid = [D.x1, D.x3]
+            B_component_array = [
+                D.bx1[:, grid_slice, :],
+                D.bx3[:, grid_slice, :]
+            ]
+        else:
+            grid = [D.x1, D.x2]
+            B_component_array = [
+                D.bx1[:, :, grid_slice],
+                D.bx2[:, :, grid_slice]
+            ]
     if dimensions == 3:
-        y_slice = -1  # not needed for 3D calculations
+        grid_slice = -1  # not needed for 3D calculations
         # construct field lines a region that starts/ends a couple of grid
         # points beyond or before shock
         offset = 5
         if flow_position == 'upstream':
-            grid = [D.x1, D.x2[shock_index + offset:], D.x3]
+            cut_index = shock_index + offset
+            xcut = cut_index if shock_direction == 'x1' else 0
+            ycut = cut_index if shock_direction == 'x2' else 0
+            zcut = cut_index if shock_direction == 'x3' else 0
+            grid = [D.x1[xcut:], D.x2[ycut:], D.x3[zcut:]]
             B_component_array = [
-                D.bx1[:, shock_index + offset:, :],
-                D.bx2[:, shock_index + offset:, :],
-                D.bx3[:, shock_index + offset:, :]
+                D.bx1[xcut:, ycut:, zcut:],
+                D.bx2[xcut:, ycut:, zcut:],
+                D.bx3[xcut:, ycut:, zcut:]
             ]
         if flow_position == 'downstream':
-            grid = [D.x1, D.x2[:shock_index - offset + 1], D.x3]
+            cut_index = shock_index - offset + 1
+            xcut = cut_index if shock_direction == 'x1' else D.n1
+            ycut = cut_index if shock_direction == 'x2' else D.n2
+            zcut = cut_index if shock_direction == 'x3' else D.n3
+            grid = [D.x1[:xcut], D.x2[:ycut], D.x3[:zcut]]
             B_component_array = [
-                D.bx1[:, :shock_index - offset + 1, :],
-                D.bx2[:, :shock_index - offset + 1, :],
-                D.bx3[:, :shock_index - offset + 1, :]
+                D.bx1[:xcut, :ycut, :zcut],
+                D.bx2[:xcut, :ycut, :zcut],
+                D.bx3[:xcut, :ycut, :zcut]
             ]
 
     nx = [0]*dimensions
@@ -220,7 +255,7 @@ def get_grid_info(dimensions, D, flow_position, shock_index):
         grid_min[dimension] = min(grid[dimension])
         grid_max[dimension] = max(grid[dimension])
 
-    return nx, grid, grid_min, grid_max, B_component_array, y_slice
+    return nx, grid, grid_min, grid_max, B_component_array, grid_slice
 
 
 def construct_field_lines(
@@ -232,8 +267,14 @@ def construct_field_lines(
     flow_position,
     shock_index
 ):
-    nx, grid, grid_min, grid_max, B_component_array, x_slice = \
-        get_grid_info(dimensions, D, flow_position, shock_index)
+    nx, grid, grid_min, grid_max, B_component_array, grid_slice = \
+        get_grid_info(
+            dimensions,
+            D,
+            flow_position,
+            shock_index,
+            shock_direction
+        )
 
     starting_positions = select_starting_positions(
         dimensions,
@@ -242,7 +283,7 @@ def construct_field_lines(
         grid_max,
         separation
     )
-    # starting_positions = [[0.01, 0.124], [0.016, 0.124]]
+    # starting_positions = [[0.1, 0.1], [0.12, 0.1]]
 
     B_field = [[], []]
     for i in (0, 1):
@@ -272,7 +313,8 @@ def construct_field_lines(
                 step_length,
                 grid_min,
                 grid_max,
-                shock_index
+                shock_index,
+                shock_direction
             )
 
             if out_of_domain:
@@ -311,7 +353,7 @@ def construct_field_lines(
         field_line_coordinates,
         field_line_components,
         step,
-        x_slice,
+        grid_slice,
     ]
 
 
@@ -341,7 +383,7 @@ def calculate_field_line_separation(
             dot_product = dot_product \
                 + B_average[dimension]*separation_vector[dimension]
 
-        B_average_magnitude = sqrt(sum(square(B_average)))   
+        B_average_magnitude = sqrt(sum(square(B_average)))
         separation_magnitude = sqrt(sum(square(separation_vector)))
         theta = arccos(
             dot_product/(B_average_magnitude*separation_magnitude)
@@ -359,51 +401,83 @@ def plot_field_lines(
     D,
     field_line_coordinates,
     field_line_components,
-    x_slice,
-    flow_position
+    grid_slice,
+    flow_position,
+    shock_direction
 ):
-    begin = 1
-    end = 128
+    begin = 45
+    end = 70
+    field_line_coordinates_plot_x = []
+    field_line_coordinates_plot_y = []
 
-    field_line_coordinates_plot_y = field_line_coordinates[:][0]
-    field_line_coordinates_plot_z = field_line_coordinates[:][1]
+    if shock_direction == 'x1':
+        grid = ['x2', 'x3']
+    if shock_direction == 'x2':
+        grid = ['x1', 'x3']
+    if shock_direction == 'x3':
+        grid = ['x1', 'x2']
+
     for i in (0, 1):
-        length = len(field_line_coordinates_plot_y[i])
+        field_line_coordinates_plot_x.append(field_line_coordinates[i][0])
+        field_line_coordinates_plot_y.append(field_line_coordinates[i][1])
+        length = len(field_line_coordinates_plot_x[i])
         for j in range(0, length):
+            x = field_line_coordinates_plot_x[i][j]
             y = field_line_coordinates_plot_y[i][j]
-            z = field_line_coordinates_plot_z[i][j]
-            if y < min(D.x2):
-                y = max(D.x2) + (y - min(D.x2))
-            if y > max(D.x2):
-                y = min(D.x2) + (y - max(D.x2))
-            if z < min(D.x3):
-                z = max(D.x3) + (z - min(D.x3))
-            if z > max(D.x3):
-                z = min(D.x3) + (z - max(D.x3))
+            xmin = min(getattr(D, grid[0]))
+            xmax = max(getattr(D, grid[0]))
+            ymin = min(getattr(D, grid[1]))
+            ymax = max(getattr(D, grid[1]))
+
+            if x < xmin:
+                x = xmax + (x - xmin)
+            if x > xmax:
+                x = xmin + (x - xmax)
+            if y < ymin:
+                y = ymax + (y - ymin)
+            if y > ymax:
+                y = ymin + (y - ymax)
+            field_line_coordinates_plot_x[i][j] = x
             field_line_coordinates_plot_y[i][j] = y
-            field_line_coordinates_plot_z[i][j] = z
 
     axis('equal')
-    quiver(
-        D.x2[begin:end],
-        D.x3[begin:end],
-        D.bx2[x_slice, begin:end, begin:end].T,
-        D.bx3[x_slice, begin:end, begin:end].T,
-        units='xy'
-    )
+    if shock_direction == 'x1':
+        quiver(
+            getattr(D, grid[0])[begin:end],
+            getattr(D, grid[1])[begin:end],
+            D.bx2[grid_slice, begin:end, begin:end].T,
+            D.bx3[grid_slice, begin:end, begin:end].T,
+            units='xy'
+        )
+    elif shock_direction == 'x2':
+        quiver(
+            getattr(D, grid[0])[begin:end],
+            getattr(D, grid[1])[begin:end],
+            D.bx1[begin:end, grid_slice, begin:end].T,
+            D.bx3[begin:end, grid_slice, begin:end].T,
+            units='xy'
+        )
+    else:
+        quiver(
+            getattr(D, grid[0])[begin:end],
+            getattr(D, grid[1])[begin:end],
+            D.bx1[begin:end, begin:end, grid_slice].T,
+            D.bx2[begin:end, begin:end, grid_slice].T,
+            units='xy'
+        )
 
     colour = ['g', 'b']
-    for i in (0, 0):
+    for i in (0, 1):
         axis('equal')
         quiver(
-            field_line_coordinates_plot_y[0],
-            field_line_coordinates_plot_z[1],
+            field_line_coordinates_plot_x[i],
+            field_line_coordinates_plot_y[i],
             field_line_components[i][0],
             field_line_components[i][1],
             units='xy',
             color=colour[i]
         )
-        # axis([0, 0.025, 0, 0.025])
+        #axis([0.1, 0.125, 0.115, 0.125])
     show()
 
 
@@ -443,6 +517,7 @@ def calculate_B_field_line_diffusion(
     D,
     flow_position,
     shock_present,
+    shock_direction,
     wdir
 ):
     dimensions = 3
@@ -455,7 +530,7 @@ def calculate_B_field_line_diffusion(
     max_plot_number = -1
 
     if shock_present:
-        shock_index = locate_shock(D)
+        shock_index = locate_shock(D, shock_direction)
     else:
         shock_index = 0
 
@@ -464,7 +539,7 @@ def calculate_B_field_line_diffusion(
     if test:
         dimensions = 2
         number_of_pairs = 1
-        number_of_steps = 30  # along B
+        number_of_steps = 10  # along B
         step_length = (max(D.x1) - min(D.x1))/(len(D.x1) - 1.)/1.
         initial_separations = [1e-3]
         number_of_separations = len(initial_separations)
@@ -479,7 +554,7 @@ def calculate_B_field_line_diffusion(
         ]
         for pair in range(0, number_of_pairs):
             print(separation, pair)
-            field_line_coordinates, field_line_components, step, x_slice = \
+            field_line_coordinates, field_line_components, step, grid_slice = \
                 construct_field_lines(
                     dimensions,
                     D,
@@ -505,8 +580,9 @@ def calculate_B_field_line_diffusion(
                     D,
                     field_line_coordinates,
                     field_line_components,
-                    x_slice,
-                    flow_position
+                    grid_slice,
+                    flow_position,
+                    shock_direction
                 )
             plot_number += 1
 
@@ -529,8 +605,9 @@ if __name__ == '__main__':
     #                'downstream'
     flow_position = 'upstream'
     file_number = 4
-    wdir = '/home/mvorster/PLUTO/B_Shock_turbulence/bx0.8_cs1.35'
+    wdir = '/home/mvorster/512_cube/bx0.8_cs1.35/perpendicular_shock/Run_1/PLUTO'
     shock_present = 1
+    shock_direction = 'x2'  # 'x1', 'x2', or 'x3'
 
     if not wdir[-1] == '/':
         wdir = wdir + '/'
@@ -544,5 +621,6 @@ if __name__ == '__main__':
         D,
         flow_position,
         shock_present,
+        shock_direction,
         wdir
     )
